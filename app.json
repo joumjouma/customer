@@ -1,0 +1,67 @@
+{
+  "expo": {
+    "name": "Caval",
+    "slug": "caval",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "scheme": "com.googleusercontent.apps.1007561335979-uiduf2a3h59mjcdassp5hl3rgljr5tes",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.caval.app",
+      "buildNumber": "1",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "Caval needs access to your location to find nearby drivers and show your position on the map.",
+        "NSLocationAlwaysUsageDescription": "Caval needs access to your location to find nearby drivers and show your position on the map.",
+        "UIBackgroundModes": ["location", "fetch"],
+        "ITSAppUsesNonExemptEncryption": false
+      },
+      "config": {
+        "usesNonExemptEncryption": false
+      }
+    },
+    "android": {
+      "package": "com.misscoding.ecoshare",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#ffffff"
+      },
+      "newArchEnabled": true
+    },
+    "web": {
+      "favicon": "./assets/favicon.png",
+      "config": {
+        "firebase": {
+          "apiKey": "AIzaSyAxeOgFmJruEmkvNdNemWzSSKGtteR5Tps",
+          "authDomain": "yeco-share-92ef1.firebaseapp.com",
+          "projectId": "eco-share-92ef1",
+          "storageBucket": "eco-share-92ef1.appspot.com",
+          "messagingSenderId": "747419763478",
+          "appId": "1:747419763478:web:a12bb5f1d9e6fa082c8637"
+        }
+      }
+    },
+    "extra": {
+      "eas": {
+        "projectId": "e9a028a2-5ad1-4cc3-9dbf-62a879c84314"
+      }
+    },
+    "plugins": [
+      "expo-secure-store",
+      [
+        "expo-build-properties",
+        {
+          "ios": {
+            "useFrameworks": "static"
+          }
+        }
+      ]
+    ]
+  }
+}

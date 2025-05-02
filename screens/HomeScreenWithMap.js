@@ -1074,4 +1074,3 @@ const HomeScreenWithMap = () => {
 };
 
 export default HomeScreenWithMap;
- 

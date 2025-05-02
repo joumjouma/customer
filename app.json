@@ -19,7 +19,10 @@
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "Caval needs access to your location to find nearby drivers and show your position on the map.",
         "NSLocationAlwaysUsageDescription": "Caval needs access to your location to find nearby drivers and show your position on the map.",
-        "UIBackgroundModes": ["location", "fetch"],
+        "UIBackgroundModes": [
+          "location",
+          "fetch"
+        ],
         "ITSAppUsesNonExemptEncryption": false
       },
       "config": {
@@ -27,12 +30,18 @@
       }
     },
     "android": {
-      "package": "com.misscoding.ecoshare",
+      "package": "com.caval.app",
+      "versionCode": 1,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "newArchEnabled": true
+      "permissions": [
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION",
+        "FOREGROUND_SERVICE"
+      ],
+      "googleServicesFile": "./google-services.json"
     },
     "web": {
       "favicon": "./assets/favicon.png",
@@ -49,7 +58,7 @@
     },
     "extra": {
       "eas": {
-        "projectId": "e9a028a2-5ad1-4cc3-9dbf-62a879c84314"
+        "projectId": "88f8c21c-ab55-4cbf-81bb-441a80e603d2"
       }
     },
     "plugins": [
@@ -62,6 +71,7 @@
           }
         }
       ]
-    ]
+    ],
+    "owner": "zouhair123"
   }
 }

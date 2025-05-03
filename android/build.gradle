@@ -7,9 +7,11 @@ buildscript {
         compileSdkVersion = 33
         targetSdkVersion = 33
         kotlinVersion = "1.8.0"
-
         ndkVersion = "25.1.8937393"
     }
+    // Add this near the top of your build.gradle file
+    def FLIPPER_VERSION = "0.182.0" // Use the latest stable version
+    
     repositories {
         google()
         mavenCentral()
@@ -34,7 +36,6 @@ allprojects {
             // Android JSC is installed from npm
             url(new File(['node', '--print', "require.resolve('jsc-android/package.json', { paths: [require.resolve('react-native/package.json')] })"].execute(null, rootDir).text.trim(), '../dist'))
         }
-
         google()
         mavenCentral()
         maven { url 'https://www.jitpack.io' }

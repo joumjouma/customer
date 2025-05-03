@@ -29,6 +29,16 @@
           "EXPO_NO_TEMP_DIR": "1"
         }
       }
+    },
+    "test": {
+      "android": {
+        "gradleCommand": ":app:assembleDebug",
+        "withoutCredentials": true,
+        "env": {
+          "EXPO_DEBUG": "true",
+          "NODE_OPTIONS": "--max_old_space_size=4096"
+        }
+      }
     }
   },
   "submit": {

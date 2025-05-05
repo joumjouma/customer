@@ -28,7 +28,6 @@ import * as Google from 'expo-auth-session/providers/google';
 import * as WebBrowser from 'expo-web-browser';
 import { auth, firebaseConfig } from "./firebase";
 import { db } from "./firebase";
-import { FirebaseRecaptchaVerifierModal } from 'expo-firebase-recaptcha';
 import { LinearGradient } from "expo-linear-gradient";
 import CustomPhoneInput from "./CustomPhoneInput";
 
@@ -48,7 +47,6 @@ function LoginScreen() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [showVerification, setShowVerification] = useState(false);
-  const recaptchaVerifier = useRef(null);
   const phoneInput = useRef(null);
 
   // Google Sign-In Configuration
@@ -228,11 +226,11 @@ function LoginScreen() {
       // Format phone number to E.164 format
       const formattedPhone = phoneNumber.startsWith('+') ? phoneNumber : `+${phoneNumber}`;
       
-      // Use the recaptchaVerifier ref properly
+      // Use Firebase's built-in phone auth
       const phoneProvider = new PhoneAuthProvider(auth);
       const verId = await phoneProvider.verifyPhoneNumber(
-        formattedPhone, 
-        recaptchaVerifier.current
+        formattedPhone,
+        auth.currentUser
       );
       
       setVerificationId(verId);
@@ -246,13 +244,6 @@ function LoginScreen() {
     } catch (err) {
       console.error('Error sending verification code:', err);
       setError(err.message || 'Échec de l\'envoi du code de vérification');
-      
-      // Handle specific Firebase errors more gracefully
-      if (err.code === 'auth/invalid-phone-number') {
-        setError('Numéro de téléphone invalide. Veuillez vérifier le format.');
-      } else if (err.code === 'auth/too-many-requests') {
-        setError('Trop de tentatives. Veuillez réessayer plus tard.');
-      }
     } finally {
       setLoading(false);
     }
@@ -411,14 +402,6 @@ function LoginScreen() {
       style={styles.container}
     >
       <StatusBar barStyle="light-content" />
-      
-      <FirebaseRecaptchaVerifierModal
-        ref={recaptchaVerifier}
-        firebaseConfig={firebaseConfig}
-        attemptInvisible={false}
-        title="Verification"
-        cancelLabel="Cancel"
-      />
       
       <TouchableOpacity 
         style={styles.themeToggle} 

@@ -20,7 +20,7 @@ import {
   PhoneAuthProvider,
 } from "firebase/auth";
 import { auth, db } from "./firebase";
-import { setDoc, doc, serverTimestamp } from "firebase/firestore"; // Fixed import here
+import { setDoc, doc, serverTimestamp } from "firebase/firestore";
 import { useNavigation } from "@react-navigation/native";
 import CavalLogo from "../assets/Caval_Logo-removebg-preview.png";
 import { LinearGradient } from "expo-linear-gradient";
@@ -28,7 +28,6 @@ import * as Google from "expo-auth-session/providers/google";
 import * as WebBrowser from "expo-web-browser";
 import { Ionicons, FontAwesome } from "@expo/vector-icons";
 import CustomPhoneInput from "./CustomPhoneInput";
-import { FirebaseRecaptchaVerifierModal } from 'expo-firebase-recaptcha';
 
 // Register for Web Browser redirect
 WebBrowser.maybeCompleteAuthSession();
@@ -47,19 +46,18 @@ function RegisterScreen() {
   const [registrationMethod, setRegistrationMethod] = useState("email"); // "email" or "phone"
   const [error, setError] = useState('');
   
-  // Phone input reference and recaptcha reference
+  // Phone input reference
   const phoneInput = useRef(null);
-  const recaptchaVerifier = useRef(null);
 
   const navigation = useNavigation();
 
-  // Google Sign in configuration - Updated with proper configuration
+  // Google Sign in configuration
   const [request, response, promptAsync] = Google.useIdTokenAuthRequest({
-    expoClientId: "YOUR_EXPO_CLIENT_ID", // Add this
-    clientId: "YOUR_WEB_CLIENT_ID", // Make sure this is correct
-    iosClientId: "YOUR_IOS_CLIENT_ID", // Make sure this is correct
-    androidClientId: "YOUR_ANDROID_CLIENT_ID", // Make sure this is correct
-    scopes: ['profile', 'email'], // Add required scopes
+    expoClientId: "YOUR_EXPO_CLIENT_ID",
+    clientId: "YOUR_WEB_CLIENT_ID",
+    iosClientId: "YOUR_IOS_CLIENT_ID",
+    androidClientId: "YOUR_ANDROID_CLIENT_ID",
+    scopes: ['profile', 'email'],
   });
 
   // Handle Google Sign In
@@ -83,7 +81,6 @@ function RegisterScreen() {
       const userCredential = await signInWithCredential(auth, credential);
       const user = userCredential.user;
 
-      // Check if this is first login and save user info
       await setDoc(
         doc(db, "Customers", user.uid),
         {
@@ -122,11 +119,11 @@ function RegisterScreen() {
       // Format phone number to E.164 format
       const formattedPhone = number.startsWith('+') ? number : `+${number}`;
       
-      // Use the recaptchaVerifier ref properly
+      // Use Firebase's built-in phone auth
       const phoneProvider = new PhoneAuthProvider(auth);
       const verId = await phoneProvider.verifyPhoneNumber(
-        formattedPhone, 
-        recaptchaVerifier.current
+        formattedPhone,
+        auth.currentUser
       );
       
       setVerificationId(verId);
@@ -149,24 +146,19 @@ function RegisterScreen() {
         return;
       }
 
-      // Create the credential
       const credential = PhoneAuthProvider.credential(verificationId, verificationCode);
-      
-      // Sign in with the credential
       const userCredential = await signInWithCredential(auth, credential);
       
-      // Create or update user document in Firestore
       const userRef = doc(db, 'Customers', userCredential.user.uid);
       await setDoc(userRef, {
         email: userCredential.user.email || "",
         firstName: fname,
         lastName: lname,
         number: number,
-        createdAt: serverTimestamp(), // Using serverTimestamp() from Firestore
+        createdAt: serverTimestamp(),
         authProvider: "phone",
       }, { merge: true });
 
-      // Navigate to home screen
       navigation.navigate("HomeScreenWithMap");
     } catch (err) {
       console.error('Error verifying code:', err);
@@ -224,19 +216,6 @@ function RegisterScreen() {
       colors={["#121212", "#1a1a1a", "#212121"]}
       style={styles.container}
     >
-      {/* Add FirebaseRecaptchaVerifierModal as JSX component */}
-      <FirebaseRecaptchaVerifierModal
-        ref={recaptchaVerifier}
-        firebaseConfig={auth.app.options}
-        title="Prove you're human"
-        cancelLabel="Close"
-      />
-
-      {/* Back Button */}
-      <TouchableOpacity style={styles.backButton} onPress={handleBack}>
-        <Ionicons name="arrow-back" size={24} color="#fff" />
-      </TouchableOpacity>
-      
       <ScrollView
         contentContainerStyle={styles.scrollContainer}
         showsVerticalScrollIndicator={false}

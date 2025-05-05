@@ -16,6 +16,7 @@ import Ionicons from "react-native-vector-icons/Ionicons";
 import { getAuth, onAuthStateChanged, signInWithCustomToken, signInWithEmailAndPassword } from "firebase/auth"; // Firebase Auth
 import { auth } from "./screens/firebase";
 import { StripeProvider } from '@stripe/stripe-react-native'; // Add this import
+import firebase from './firebase.config';
 
 // Import Screens
 import LoginScreen from "./screens/LoginScreen";

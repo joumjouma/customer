@@ -1,12 +1,12 @@
 // firebase.js
-import { initializeApp } from "firebase/app";
-import { getFirestore } from "firebase/firestore";
-import { getAuth, initializeAuth, getReactNativePersistence } from "firebase/auth";
+import firebase from '@react-native-firebase/app';
+import '@react-native-firebase/auth';
+import '@react-native-firebase/firestore';
+import '@react-native-firebase/database';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { getDatabase } from "firebase/database";
 
-// Your web app's Firebase configuration
-export const firebaseConfig = {
+// Firebase configuration
+const firebaseConfig = {
   apiKey: "AIzaSyAxeOgFmJruEmkvNdNemWzSSKGtteR5Tps",
   authDomain: "eco-share-92ef1.firebaseapp.com",
   projectId: "eco-share-92ef1",
@@ -16,19 +16,15 @@ export const firebaseConfig = {
   measurementId: "G-WX3CXQJGMP",
 };
 
-// Initialize Firebase app
-const app = initializeApp(firebaseConfig);
+// Initialize Firebase
+if (!firebase.apps.length) {
+  firebase.initializeApp(firebaseConfig);
+}
 
-// Initialize auth with persistence
-const auth = initializeAuth(app, {
-  persistence: getReactNativePersistence(AsyncStorage)
-});
+// Get Firebase services
+const auth = firebase.auth();
+const db = firebase.firestore();
+const rtdb = firebase.database();
 
-// Initialize Firestore
-const db = getFirestore(app);
-
-// Initialize Realtime Database
-const rtdb = getDatabase(app);
-
-export { auth, db, rtdb };
-export default app;
+export { auth, db, rtdb, firebaseConfig };
+export default firebase; 

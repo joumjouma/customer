@@ -10,6 +10,9 @@ module.exports = function(api) {
           path: '.env',
         },
       ],
+      '@babel/plugin-proposal-export-namespace-from',
+      'react-native-reanimated/plugin',
+      '@babel/plugin-transform-runtime'
     ],
   };
 };

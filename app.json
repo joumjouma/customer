@@ -70,8 +70,21 @@
             "useFrameworks": "static"
           }
         }
+      ],
+      "expo-web-browser",
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Allow Caval to use your location."
+        }
       ]
     ],
-    "owner": "zouhair123"
+    "owner": "zouhair123",
+    "runtimeVersion": {
+      "policy": "sdkVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/88f8c21c-ab55-4cbf-81bb-441a80e603d2"
+    }
   }
 }

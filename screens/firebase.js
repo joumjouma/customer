@@ -1,30 +1,22 @@
-// firebase.js
-import firebase from '@react-native-firebase/app';
-import '@react-native-firebase/auth';
-import '@react-native-firebase/firestore';
-import '@react-native-firebase/database';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+// firebase.js (for Firebase v9+)
+import { initializeApp } from "firebase/app";
+import { getAuth } from "firebase/auth";
+import { getFirestore } from "firebase/firestore";
+import { getDatabase } from "firebase/database";
 
-// Firebase configuration
 const firebaseConfig = {
-  apiKey: "AIzaSyAxeOgFmJruEmkvNdNemWzSSKGtteR5Tps",
+  apiKey: "AIzaSyBMQW59pFle0vVp0xotmnpVTYqAlTbdbQQ",
   authDomain: "eco-share-92ef1.firebaseapp.com",
   projectId: "eco-share-92ef1",
   storageBucket: "eco-share-92ef1.appspot.com",
   messagingSenderId: "747419763478",
-  appId: "1:747419763478:web:a12bb5f1d9e6fa082c8637",
+  appId: "1:747419763478:web:2a27c6cb85ad28922c8637",
   measurementId: "G-WX3CXQJGMP",
 };
 
-// Initialize Firebase
-if (!firebase.apps.length) {
-  firebase.initializeApp(firebaseConfig);
-}
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+const rtdb = getDatabase(app);
 
-// Get Firebase services
-const auth = firebase.auth();
-const db = firebase.firestore();
-const rtdb = firebase.database();
-
-export { auth, db, rtdb, firebaseConfig };
-export default firebase; 
+export { app, auth, db, rtdb };

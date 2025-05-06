@@ -14,15 +14,13 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.caval.app",
+      "bundleIdentifier": "com.caval.courier.ios",
+      "googleServicesFile": "./GoogleService-Info.plist",
       "buildNumber": "1",
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "Caval needs access to your location to find nearby drivers and show your position on the map.",
         "NSLocationAlwaysUsageDescription": "Caval needs access to your location to find nearby drivers and show your position on the map.",
-        "UIBackgroundModes": [
-          "location",
-          "fetch"
-        ],
+        "UIBackgroundModes": ["location", "fetch"],
         "ITSAppUsesNonExemptEncryption": false
       },
       "config": {
@@ -80,9 +78,7 @@
       ]
     ],
     "owner": "zouhair123",
-    "runtimeVersion": {
-      "policy": "sdkVersion"
-    },
+    "runtimeVersion":"1.0.0",
     "updates": {
       "url": "https://u.expo.dev/88f8c21c-ab55-4cbf-81bb-441a80e603d2"
     }

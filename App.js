@@ -52,9 +52,9 @@ const Tab = createBottomTabNavigator();
 LogBox.ignoreLogs(['Warning: ...']); // Ignore non-critical warnings
 
 export default function App() {
-  const [authState, setAuthState] = useState(null);
+  const [authState, setAuthState] = useState();
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [error, setError] = useState();
   // Controls whether the splash screen is rendered.
   const [showSplash, setShowSplash] = useState(true);
   // Animated value for fading out the splash screen.
@@ -98,7 +98,7 @@ export default function App() {
   // Modify the auth state change effect
   useEffect(() => {
     console.log('Starting auth state check...');
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+    const unsubscribe = auth.onAuthStateChanged(user => {
       try {
         console.log('Auth state changed:', user ? 'User logged in' : 'No user');
         if (user) {

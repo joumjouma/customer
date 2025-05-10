@@ -21,7 +21,7 @@ import MapViewDirections from "react-native-maps-directions";
 import { useRoute, useNavigation } from "@react-navigation/native";
 import { GOOGLE_MAPS_APIKEY } from "@env";
 import { doc, onSnapshot, updateDoc } from "firebase/firestore";
-import { db } from "./firebase";
+import { firestore } from "../firebase.config";
 import { Ionicons, MaterialIcons, Feather, FontAwesome5 } from "@expo/vector-icons";
 import * as Location from "expo-location";
 import { LinearGradient } from "expo-linear-gradient";
@@ -141,7 +141,7 @@ const DriverFoundScreen = () => {
   useEffect(() => {
     if (!rideId) return;
 
-    const rideRequestRef = doc(db, "rideRequests", rideId);
+    const rideRequestRef = doc(firestore, "rideRequests", rideId);
     const unsubscribe = onSnapshot(rideRequestRef, (docSnap) => {
       if (docSnap.exists()) {
         const data = docSnap.data();
@@ -289,7 +289,7 @@ const DriverFoundScreen = () => {
   // Listen for real-time driver location updates via Firebase
   useEffect(() => {
     if (!driverId) return;
-    const driverDocRef = doc(db, "Drivers", driverId);
+    const driverDocRef = doc(firestore, "Drivers", driverId);
     const unsubscribe = onSnapshot(driverDocRef, (docSnapshot) => {
       const data = docSnapshot.data();
       if (data && data.latitude && data.longitude) {

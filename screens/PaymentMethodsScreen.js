@@ -25,7 +25,7 @@ import {
   updateDoc,
   doc,
 } from 'firebase/firestore';
-import { db } from './firebase';
+import { firestore } from '../firebase.config';
 import { getAuth } from 'firebase/auth';
 
 const PaymentMethodsScreen = () => {
@@ -64,7 +64,7 @@ const PaymentMethodsScreen = () => {
     }
     try {
       const q = query(
-        collection(db, 'paymentMethods'),
+        collection(firestore, 'paymentMethods'),
         where('userId', '==', currentUser.uid)
       );
       const querySnapshot = await getDocs(q);
@@ -126,7 +126,7 @@ const PaymentMethodsScreen = () => {
       };
       
       console.log('Saving cash payment method to Firestore:', methodData);
-      const docRef = await addDoc(collection(db, 'paymentMethods'), methodData);
+      const docRef = await addDoc(collection(firestore, 'paymentMethods'), methodData);
       const newMethod = { id: docRef.id, ...methodData };
       setPaymentMethods([...paymentMethods, newMethod]);
       if (isDefault) {
@@ -141,7 +141,7 @@ const PaymentMethodsScreen = () => {
 
   const removePaymentMethod = async (id) => {
     try {
-      await deleteDoc(doc(db, 'paymentMethods', id));
+      await deleteDoc(doc(firestore, 'paymentMethods', id));
       const updatedMethods = paymentMethods.filter((method) => method.id !== id);
       setPaymentMethods(updatedMethods);
       if (defaultMethod === id && updatedMethods.length > 0) {
@@ -158,10 +158,10 @@ const PaymentMethodsScreen = () => {
   const setDefaultPaymentMethod = async (id) => {
     try {
       if (defaultMethod) {
-        const prevDefaultDoc = doc(db, 'paymentMethods', defaultMethod);
+        const prevDefaultDoc = doc(firestore, 'paymentMethods', defaultMethod);
         await updateDoc(prevDefaultDoc, { isDefault: false });
       }
-      const newDefaultDoc = doc(db, 'paymentMethods', id);
+      const newDefaultDoc = doc(firestore, 'paymentMethods', id);
       await updateDoc(newDefaultDoc, { isDefault: true });
       const updatedMethods = paymentMethods.map((method) => ({
         ...method,

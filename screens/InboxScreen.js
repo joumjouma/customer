@@ -13,7 +13,7 @@ import {
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { collection, query, where, orderBy, onSnapshot, doc, getDoc } from 'firebase/firestore';
-import { db } from './firebase';
+import { firestore } from '../firebase.config';
 import { getAuth } from 'firebase/auth';
 import ProfilePicture from '../components/ProfilePicture';
 
@@ -54,7 +54,7 @@ const InboxScreen = () => {
       }
       
       const q = query(
-        collection(db, 'conversations'),
+        collection(firestore, 'conversations'),
         where('participants', 'array-contains', currentUser.uid),
         orderBy('lastMessageTime', 'desc')
       );
@@ -78,12 +78,12 @@ const InboxScreen = () => {
           let userDetails = null;
           
           try {
-            const customerDoc = await getDoc(doc(db, 'Customers', otherUserId));
+            const customerDoc = await getDoc(doc(firestore, 'Customers', otherUserId));
             if (customerDoc.exists()) {
               userDetails = customerDoc.data();
               userDetails.type = 'customer';
             } else {
-              const driverDoc = await getDoc(doc(db, 'Drivers', otherUserId));
+              const driverDoc = await getDoc(doc(firestore, 'Drivers', otherUserId));
               if (driverDoc.exists()) {
                 userDetails = driverDoc.data();
                 userDetails.type = 'driver';

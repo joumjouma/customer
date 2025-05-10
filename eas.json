@@ -8,12 +8,19 @@
     "development": {
       "developmentClient": true,
       "distribution": "internal",
+      "ios": {
+        "simulator": true
+      },
       "android": {
         "gradleCommand": ":app:assembleDebug"
       }
     },
     "preview": {
       "distribution": "internal",
+      "ios": {
+        "simulator": false,
+        "buildConfiguration": "Release"
+      },
       "android": {
         "buildType": "apk",
         "gradleCommand": ":app:assembleRelease",
@@ -23,6 +30,9 @@
       }
     },
     "production": {
+      "ios": {
+        "buildConfiguration": "Release"
+      },
       "android": {
         "buildType": "app-bundle",
         "env": {
@@ -31,6 +41,10 @@
       }
     },
     "test": {
+      "ios": {
+        "simulator": true,
+        "buildConfiguration": "Debug"
+      },
       "android": {
         "gradleCommand": ":app:assembleDebug",
         "withoutCredentials": true,

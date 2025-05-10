@@ -19,6 +19,7 @@ import {
   GoogleAuthProvider,
   signInWithCredential,
   PhoneAuthProvider,
+  RecaptchaVerifier,
 } from "firebase/auth";
 import { doc, getDoc, setDoc, updateDoc, serverTimestamp } from "firebase/firestore";
 import CavalLogo from "../assets/Caval_Logo-removebg-preview.png";
@@ -26,8 +27,7 @@ import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Google from 'expo-auth-session/providers/google';
 import * as WebBrowser from 'expo-web-browser';
-import { auth, firebaseConfig } from "./firebase";
-import { db } from "./firebase";
+import { auth, firestore } from "../firebase.config";
 import { LinearGradient } from "expo-linear-gradient";
 import CustomPhoneInput from "./CustomPhoneInput";
 
@@ -55,6 +55,24 @@ function LoginScreen() {
     androidClientId: 'YOUR_ANDROID_CLIENT_ID', // Replace with your Android client ID
     iosClientId: 'YOUR_IOS_CLIENT_ID', // Replace with your iOS client ID
   });
+
+  // Set up reCAPTCHA verifier
+  useEffect(() => {
+    if (Platform.OS === 'web') {
+      window.recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
+        'size': 'invisible',
+        'callback': (response) => {
+          // reCAPTCHA solved, allow signInWithPhoneNumber.
+          console.log('reCAPTCHA verified');
+        },
+        'expired-callback': () => {
+          // Response expired. Ask user to solve reCAPTCHA again.
+          console.log('reCAPTCHA expired');
+          Alert.alert('Error', 'reCAPTCHA verification expired. Please try again.');
+        }
+      });
+    }
+  }, []);
 
   // Handle Google Sign-In response
   useEffect(() => {
@@ -105,7 +123,7 @@ function LoginScreen() {
         console.log("User signed in successfully:", user.email);
 
         // Check if user document exists in Firestore
-        const docRef = doc(db, "Customers", user.uid);
+        const docRef = doc(firestore, "Customers", user.uid);
         const docSnap = await getDoc(docRef);
 
         if (!docSnap.exists()) {
@@ -188,7 +206,7 @@ function LoginScreen() {
       };
       
       // Create or update user document in Firestore
-      const userRef = doc(db, 'Customers', userCredential.user.uid);
+      const userRef = doc(firestore, 'Customers', userCredential.user.uid);
       await setDoc(userRef, {
         email: userCredential.user.email,
         firstName: userCredential.user.displayName?.split(' ')[0] || "",
@@ -228,10 +246,20 @@ function LoginScreen() {
       
       // Use Firebase's built-in phone auth
       const phoneProvider = new PhoneAuthProvider(auth);
-      const verId = await phoneProvider.verifyPhoneNumber(
-        formattedPhone,
-        auth.currentUser
-      );
+      
+      let verId;
+      if (Platform.OS === 'web') {
+        // For web platform, use reCAPTCHA verifier
+        if (!window.recaptchaVerifier) {
+          setError('Erreur de configuration reCAPTCHA. Veuillez réessayer.');
+          setLoading(false);
+          return;
+        }
+        verId = await phoneProvider.verifyPhoneNumber(formattedPhone, window.recaptchaVerifier);
+      } else {
+        // For mobile platforms, use Firebase's native phone auth
+        verId = await phoneProvider.verifyPhoneNumber(formattedPhone);
+      }
       
       setVerificationId(verId);
       setShowVerification(true);
@@ -243,7 +271,23 @@ function LoginScreen() {
       );
     } catch (err) {
       console.error('Error sending verification code:', err);
-      setError(err.message || 'Échec de l\'envoi du code de vérification');
+      if (err.code === 'auth/invalid-phone-number') {
+        setError('Numéro de téléphone invalide. Veuillez vérifier et réessayer.');
+      } else if (err.code === 'auth/too-many-requests') {
+        setError('Trop de tentatives. Veuillez réessayer plus tard.');
+      } else if (err.code === 'auth/captcha-check-failed') {
+        setError('Vérification reCAPTCHA échouée. Veuillez réessayer.');
+        if (Platform.OS === 'web' && window.recaptchaVerifier) {
+          window.recaptchaVerifier.clear();
+          window.recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
+            'size': 'invisible',
+            'callback': () => console.log('reCAPTCHA verified'),
+            'expired-callback': () => console.log('reCAPTCHA expired')
+          });
+        }
+      } else {
+        setError(err.message || 'Échec de l\'envoi du code de vérification');
+      }
     } finally {
       setLoading(false);
     }
@@ -270,7 +314,7 @@ function LoginScreen() {
         const mockUserId = "dev-user-" + Date.now();
         
         // Create or update user document in Firestore with "number" field
-        const userRef = doc(db, 'Customers', mockUserId);
+        const userRef = doc(firestore, 'Customers', mockUserId);
         await setDoc(userRef, {
           number: phoneNumber, // Store as "number" instead of "phoneNumber"
           firstName: fname || '',
@@ -314,7 +358,7 @@ function LoginScreen() {
       console.log("User signed in successfully:", userCredential.user.uid);
       
       // Check if user document exists in Firestore
-      const userRef = doc(db, 'Customers', userCredential.user.uid);
+      const userRef = doc(firestore, 'Customers', userCredential.user.uid);
       const userDoc = await getDoc(userRef);
       
       const userPhoneNumber = userCredential.user.phoneNumber || phoneNumber;
@@ -526,6 +570,11 @@ function LoginScreen() {
                       defaultCode="DJ"
                     />
                   </View>
+
+                  {/* Add reCAPTCHA container for web platform */}
+                  {Platform.OS === 'web' && (
+                    <View id="recaptcha-container" style={styles.recaptchaContainer} />
+                  )}
                 </>
               ) : (
                 <>
@@ -813,6 +862,12 @@ const styles = StyleSheet.create({
   },
   keyboardAvoidingView: {
     flex: 1,
+  },
+  recaptchaContainer: {
+    marginVertical: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 60,
   },
 });
 

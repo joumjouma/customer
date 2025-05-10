@@ -19,7 +19,7 @@ import {
   GoogleAuthProvider,
   PhoneAuthProvider,
 } from "firebase/auth";
-import { auth, db } from "./firebase";
+import { auth, firestore } from "../firebase.config";
 import { setDoc, doc, serverTimestamp } from "firebase/firestore";
 import { useNavigation } from "@react-navigation/native";
 import CavalLogo from "../assets/Caval_Logo-removebg-preview.png";
@@ -82,7 +82,7 @@ function RegisterScreen() {
       const user = userCredential.user;
 
       await setDoc(
-        doc(db, "Customers", user.uid),
+        doc(firestore, "Customers", user.uid),
         {
           email: user.email,
           firstName: user.displayName ? user.displayName.split(" ")[0] : "",
@@ -149,7 +149,7 @@ function RegisterScreen() {
       const credential = PhoneAuthProvider.credential(verificationId, verificationCode);
       const userCredential = await signInWithCredential(auth, credential);
       
-      const userRef = doc(db, 'Customers', userCredential.user.uid);
+      const userRef = doc(firestore, 'Customers', userCredential.user.uid);
       await setDoc(userRef, {
         email: userCredential.user.email || "",
         firstName: fname,
@@ -182,7 +182,7 @@ function RegisterScreen() {
       const user = userCredential.user;
 
       // Save user data in Firestore
-      await setDoc(doc(db, "Customers", user.uid), {
+      await setDoc(doc(firestore, "Customers", user.uid), {
         email: user.email,
         firstName: fname,
         lastName: lname,

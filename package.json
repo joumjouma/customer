@@ -84,6 +84,7 @@
     "@babel/core": "^7.24.0",
     "@babel/plugin-transform-runtime": "^7.27.1",
     "@expo/metro-config": "~0.20.0",
+    "babel-plugin-dotenv-import": "^3.0.1",
     "babel-plugin-module-resolver": "^5.0.2",
     "metro": "^0.82.0",
     "metro-core": "^0.76.7",

@@ -14,7 +14,7 @@ import {
 import { useNavigation } from "@react-navigation/native";
 import Ionicons from "react-native-vector-icons/Ionicons";
 import { doc, getDoc } from "firebase/firestore";
-import { auth, db } from "./firebase";
+import { auth, firestore } from "../firebase.config";
 import { LinearGradient } from "expo-linear-gradient";
 
 const AccountScreen = () => {
@@ -33,7 +33,7 @@ const AccountScreen = () => {
           navigation.navigate("LoginScreen");
           return;
         }
-        const docRef = doc(db, "Customers", user.uid);
+        const docRef = doc(firestore, "Customers", user.uid);
         const docSnap = await getDoc(docRef);
         if (docSnap.exists()) {
           setUserDetails(docSnap.data());

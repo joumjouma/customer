@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useContext } from "react";
-import { auth, db } from "./firebase";
+import { auth, firestore } from "../firebase.config";
 import { doc, getDoc, updateDoc, setDoc, collection, getDocs } from "firebase/firestore";
 import * as ImagePicker from "expo-image-picker";
 import {
@@ -117,7 +117,7 @@ function Profile() {
       console.log("Fetching data for user:", user.uid);
       
       // Try to get the user document from Firestore
-      const docRef = doc(db, "Customers", user.uid);
+      const docRef = doc(firestore, "Customers", user.uid);
       const docSnap = await getDoc(docRef);
       
       if (docSnap.exists()) {
@@ -195,7 +195,7 @@ function Profile() {
         }
 
         // Update the user document with the new photo URL
-        const docRef = doc(db, "Customers", currentUser.uid);
+        const docRef = doc(firestore, "Customers", currentUser.uid);
         await updateDoc(docRef, {
           photo: imageUri
         });

@@ -17,7 +17,7 @@ import MapView, { Marker } from "react-native-maps";
 import MapViewDirections from "react-native-maps-directions";
 import { useRoute, useNavigation } from "@react-navigation/native";
 import { GOOGLE_MAPS_APIKEY } from "@env";
-import { db } from "./firebase";
+import { firestore } from "../firebase.config";
 import { doc, onSnapshot, updateDoc } from "firebase/firestore";
 import { MaterialIcons, Ionicons } from '@expo/vector-icons';
 import * as Location from "expo-location";
@@ -203,7 +203,7 @@ const FindingDriverScreen = () => {
   useEffect(() => {
     if (!rideRequestId) return;
 
-    const rideRequestRef = doc(db, "rideRequests", rideRequestId);
+    const rideRequestRef = doc(firestore, "rideRequests", rideRequestId);
     const unsubscribe = onSnapshot(rideRequestRef, async (docSnap) => {
       if (docSnap.exists()) {
         const data = docSnap.data();
@@ -262,7 +262,7 @@ const FindingDriverScreen = () => {
       // First, update Firestore
       if (rideRequestId) {
         console.log("Updating ride status in Firestore...");
-        const rideRequestRef = doc(db, "rideRequests", rideRequestId);
+        const rideRequestRef = doc(firestore, "rideRequests", rideRequestId);
         await updateDoc(rideRequestRef, {
           status: "declined",
           cancelledAt: new Date(),

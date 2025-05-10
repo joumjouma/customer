@@ -15,7 +15,7 @@ import {
 } from "react-native";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import Ionicons from "react-native-vector-icons/Ionicons";
-import { auth, db } from "./firebase";
+import { auth, firestore } from "../firebase.config";
 import { doc, getDoc, updateDoc } from "firebase/firestore";
 import {
   updateEmail,
@@ -45,7 +45,7 @@ const ModifyFieldScreen = () => {
         const user = auth.currentUser;
         if (user) {
           try {
-            const docRef = doc(db, "Customers", user.uid);
+            const docRef = doc(firestore, "Customers", user.uid);
             const docSnap = await getDoc(docRef);
             if (docSnap.exists()) {
               const data = docSnap.data();
@@ -152,7 +152,7 @@ const ModifyFieldScreen = () => {
         if (value !== user.email) {
           await updateEmail(user, value);
         }
-        const docRef = doc(db, "Customers", user.uid);
+        const docRef = doc(firestore, "Customers", user.uid);
         await updateDoc(docRef, { email: value });
         Alert.alert("Succès", `${title} mis à jour avec succès.`);
       }
@@ -166,7 +166,7 @@ const ModifyFieldScreen = () => {
         const nameParts = value.trim().split(" ");
         const firstName = nameParts[0];
         const lastName = nameParts.slice(1).join(" ") || "";
-        const docRef = doc(db, "Customers", user.uid);
+        const docRef = doc(firestore, "Customers", user.uid);
         await updateDoc(docRef, { firstName, lastName });
         Alert.alert("Succès", `${title} mis à jour avec succès.`);
       }
@@ -177,7 +177,7 @@ const ModifyFieldScreen = () => {
           setLoading(false);
           return;
         }
-        const docRef = doc(db, "Customers", user.uid);
+        const docRef = doc(firestore, "Customers", user.uid);
         await updateDoc(docRef, { number: value });
         Alert.alert("Succès", `${title} mis à jour avec succès.`);
       }

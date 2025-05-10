@@ -21,7 +21,7 @@ extensions.configure(com.facebook.react.ReactSettingsExtension) { ex ->
   }
 }
 
-rootProject.name = 'Ecoshare'
+rootProject.name = 'Caval'
 
 dependencyResolutionManagement {
   versionCatalogs {

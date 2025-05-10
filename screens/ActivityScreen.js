@@ -10,7 +10,7 @@ import {
   useColorScheme as _useColorScheme,
 } from "react-native";
 import { useNavigation } from "@react-navigation/native";
-import { db } from "./firebase";
+import { firestore, auth } from "../firebase.config";
 import {
   collection,
   query,
@@ -19,7 +19,6 @@ import {
   limit,
   onSnapshot,
 } from "firebase/firestore";
-import { getAuth } from "firebase/auth";
 import { Ionicons } from "@expo/vector-icons";
 import { GOOGLE_MAPS_APIKEY } from "@env";
 import { StatusBar } from "expo-status-bar";
@@ -77,7 +76,6 @@ async function geocodeLatLng(lat, lng) {
 
 function ActivityScreen() {
   const navigation = useNavigation();
-  const auth = getAuth();
   const [rides, setRides] = useState([]);
   const [loading, setLoading] = useState(true);
   const [addressMap, setAddressMap] = useState({});
@@ -92,7 +90,7 @@ function ActivityScreen() {
       setLoading(false);
       return;
     }
-    const ridesRef = collection(db, "rideRequests");
+    const ridesRef = collection(firestore, "rideRequests");
     const q = query(
       ridesRef,
       where("userId", "==", currentUser.uid),

@@ -15,7 +15,7 @@ import { useRoute, useNavigation } from "@react-navigation/native";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { GOOGLE_MAPS_APIKEY } from "@env";
 import { collection, addDoc, serverTimestamp, query, where, getDocs, limit, getDoc, doc } from "firebase/firestore";
-import { db } from "./firebase";
+import { firestore } from "../firebase.config";
 import { getAuth } from "firebase/auth";
 
 // Your custom pin and Caval Moto icon
@@ -139,11 +139,11 @@ const RideOptionsScreen = () => {
     const userId = currentUser.uid;
     try {
       // Get customer data from Firestore
-      const customerDoc = await getDoc(doc(db, "Customers", userId));
+      const customerDoc = await getDoc(doc(firestore, "Customers", userId));
       const customerData = customerDoc.exists() ? customerDoc.data() : null;
 
       // Create the main ride request document
-      const rideRequestDoc = await addDoc(collection(db, "rideRequests"), {
+      const rideRequestDoc = await addDoc(collection(firestore, "rideRequests"), {
         userId,
         pickupLat: origin.latitude,
         pickupLng: origin.longitude,
@@ -165,7 +165,7 @@ const RideOptionsScreen = () => {
       });
 
       // Create a document in rideRequestsDriver collection with customer information
-      await addDoc(collection(db, "rideRequestsDriver"), {
+      await addDoc(collection(firestore, "rideRequestsDriver"), {
         rideRequestId: rideRequestDoc.id,
         number: customerData?.number || null,
         photo: customerData?.photo || null,
@@ -189,7 +189,7 @@ const RideOptionsScreen = () => {
       if (currentUser) {
         const userId = currentUser.uid;
         const paymentMethodsQuery = query(
-          collection(db, "paymentMethods"),
+          collection(firestore, "paymentMethods"),
           where("userId", "==", userId),
           limit(10)
         );

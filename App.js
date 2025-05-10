@@ -13,9 +13,10 @@ import { createStackNavigator } from "@react-navigation/stack";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import Ionicons from "react-native-vector-icons/Ionicons";
-import { getAuth, onAuthStateChanged, signInWithCustomToken, signInWithEmailAndPassword } from "firebase/auth"; // Firebase Auth
-import { auth } from "./screens/firebase";
-import { StripeProvider } from '@stripe/stripe-react-native'; // Add this import
+import { onAuthStateChanged } from "firebase/auth";
+import { auth } from "./firebase.config";
+import { StripeProvider } from '@stripe/stripe-react-native';
+import { getAuth, signInWithCustomToken, signInWithEmailAndPassword } from "firebase/auth"; // Firebase Auth
 import firebase from './firebase.config';
 
 // Import Screens
@@ -44,6 +45,7 @@ import CustomerInboxScreen from './screens/CustomerInboxScreen';
 // -----------------------------------------------------------
 
 import "react-native-get-random-values";
+import FirebaseTest from "./components/FirebaseTest";
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -98,7 +100,7 @@ export default function App() {
   // Modify the auth state change effect
   useEffect(() => {
     console.log('Starting auth state check...');
-    const unsubscribe = auth.onAuthStateChanged(user => {
+    const unsubscribe = onAuthStateChanged(auth, user => {
       try {
         console.log('Auth state changed:', user ? 'User logged in' : 'No user');
         if (user) {
@@ -138,6 +140,9 @@ export default function App() {
 
   // Bottom Tab Navigator (Home, Activity, Profile)
   function HomeTabs() {
+    // Add null check for authState and ensure we provide proper defaults for HomeScreenWithMap
+    const userName = authState?.displayName || "User";
+    
     return (
       <Tab.Navigator
         screenOptions={({ route }) => ({
@@ -203,8 +208,17 @@ export default function App() {
           }
         })}
       >
-        <Tab.Screen name="Home" options={{ headerShown: false }}>
-          {() => <HomeScreenWithMap userName={authState?.displayName || "User"} />}
+        <Tab.Screen 
+          name="Home" 
+          options={{ headerShown: false }}
+        >
+          {() => <HomeScreenWithMap 
+            userName={userName} 
+            rides={[]} 
+            bookings={[]}
+            notifications={[]}
+            messages={[]}
+          />}
         </Tab.Screen>
         <Tab.Screen
           name="Activity"
@@ -238,6 +252,29 @@ export default function App() {
           source={require("./assets/Caval_Logo-removebg-preview.png")}
           style={[styles.splashImage, { transform: [{ scale: logoScale }] }]}
         />
+      </View>
+    );
+  }
+
+  if (showSplash) {
+    return (
+      <View style={styles.splashContainer}>
+        <Animated.View
+          style={[
+            styles.splashContent,
+            {
+              opacity: splashOpacity,
+              transform: [{ scale: logoScale }],
+            },
+          ]}
+        >
+          <Image
+            source={require("./assets/Caval_Logo.png")}
+            style={styles.splashLogo}
+          />
+          <Text style={styles.splashText}>Caval</Text>
+        </Animated.View>
+        <FirebaseTest />
       </View>
     );
   }
@@ -343,7 +380,7 @@ export default function App() {
         {showSplash && (
           <Animated.View style={[styles.splashContainer, { opacity: splashOpacity }]}>
             <Animated.Image
-              source={require("./assets/Caval_Logo-removebg-preview.png")}
+              source={require("./assets/Caval_Logo.png")}
               style={[styles.splashImage, { transform: [{ scale: logoScale }] }]}
             />
           </Animated.View>
@@ -384,5 +421,25 @@ const styles = StyleSheet.create({
   errorSubText: {
     color: 'gray',
     fontSize: 16,
+  },
+  splashContent: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  splashLogo: {
+    width: 100,
+    height: 100,
+    resizeMode: "contain",
+  },
+  splashText: {
+    color: "#fff",
+    fontSize: 24,
+    fontWeight: "bold",
+    marginTop: 10,
   },
 });

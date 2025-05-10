@@ -17,7 +17,7 @@ import {
 import { useRoute, useNavigation } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { collection, query, where, orderBy, onSnapshot, addDoc, serverTimestamp, doc, updateDoc, getDocs, getDoc } from 'firebase/firestore';
-import { db } from './firebase';
+import { firestore } from '../firebase.config';
 import { getAuth } from 'firebase/auth';
 import { formatDistanceToNow } from 'date-fns';
 import ProfilePicture from '../components/ProfilePicture';
@@ -47,7 +47,7 @@ const CustomerInboxScreen = () => {
     // Get conversation details including driver photo
     const getConversationDetails = async () => {
       try {
-        const conversationRef = doc(db, 'conversations', conversationId);
+        const conversationRef = doc(firestore, 'conversations', conversationId);
         const conversationDoc = await getDoc(conversationRef);
         if (conversationDoc.exists()) {
           const data = conversationDoc.data();
@@ -64,7 +64,7 @@ const CustomerInboxScreen = () => {
     getConversationDetails();
 
     // Query messages for this conversation
-    const messagesRef = collection(db, 'conversations', conversationId, 'messages');
+    const messagesRef = collection(firestore, 'conversations', conversationId, 'messages');
     const q = query(messagesRef, orderBy('timestamp', 'asc'));
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -91,7 +91,7 @@ const CustomerInboxScreen = () => {
     // Mark conversation as read for customer
     const markAsRead = async () => {
       try {
-        const conversationRef = doc(db, 'conversations', conversationId);
+        const conversationRef = doc(firestore, 'conversations', conversationId);
         await updateDoc(conversationRef, {
           'readBy.customer': true,
           updatedAt: serverTimestamp()
@@ -119,7 +119,7 @@ const CustomerInboxScreen = () => {
       }
 
       // Add message to conversation
-      const messagesRef = collection(db, 'conversations', conversationId, 'messages');
+      const messagesRef = collection(firestore, 'conversations', conversationId, 'messages');
       const messageRef = await addDoc(messagesRef, {
         text: newMessage.trim(),
         senderId: currentUser.uid,
@@ -129,12 +129,12 @@ const CustomerInboxScreen = () => {
       });
 
       // Update message status to sent
-      await updateDoc(doc(db, 'conversations', conversationId, 'messages', messageRef.id), {
+      await updateDoc(doc(firestore, 'conversations', conversationId, 'messages', messageRef.id), {
         status: 'sent'
       });
 
       // Update conversation's last message
-      const conversationRef = doc(db, 'conversations', conversationId);
+      const conversationRef = doc(firestore, 'conversations', conversationId);
       await updateDoc(conversationRef, {
         lastMessage: newMessage.trim(),
         lastMessageTime: serverTimestamp(),

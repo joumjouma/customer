@@ -25,8 +25,7 @@ import { GOOGLE_MAPS_APIKEY } from "@env";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { LinearGradient } from "expo-linear-gradient";
 import { doc, getDoc, collection, addDoc } from "firebase/firestore";
-import { getAuth } from "firebase/auth";
-import { db } from "./firebase";
+import { auth, firestore } from "../firebase.config";
 import CavalLogo from "../assets/Caval_Logo-removebg-preview.png";
 import CustomPin from "../assets/CustomPin.png";
 import { useNavigation, useRoute } from "@react-navigation/native";
@@ -35,7 +34,7 @@ const RECENT_SEARCHES_KEY = "recentSearches";
 const THEME_STORAGE_KEY = "appTheme";
 const { width, height } = Dimensions.get("window");
 
-const HomeScreenWithMap = () => {
+const HomeScreenWithMap = ({ userName = "User" }) => {
   const navigation = useNavigation();
   const route = useRoute();
   const [isSearchFocused, setIsSearchFocused] = useState(false);
@@ -78,7 +77,7 @@ const HomeScreenWithMap = () => {
   const [pickupInputVisible, setPickupInputVisible] = useState(false);
 
   // Customer info
-  const [customerFirstName, setCustomerFirstName] = useState("Client");
+  const [customerFirstName, setCustomerFirstName] = useState(userName);
   const [customerPhoto, setCustomerPhoto] = useState(null);
   const [customerPhone, setCustomerPhone] = useState(null);
   const [customerTariff, setCustomerTariff] = useState(null);
@@ -88,8 +87,6 @@ const HomeScreenWithMap = () => {
 
   const [recentSearches, setRecentSearches] = useState([]);
   const [searchText, setSearchText] = useState("");
-
-  const auth = getAuth();
 
   const googlePlacesRef = useRef(null);
   const googlePickupRef = useRef(null);
@@ -168,25 +165,28 @@ const HomeScreenWithMap = () => {
       const currentUser = auth.currentUser;
       if (currentUser) {
         try {
-          const docRef = doc(db, "Customers", currentUser.uid);
+          const docRef = doc(firestore, "Customers", currentUser.uid);
           const docSnap = await getDoc(docRef);
           if (docSnap.exists()) {
             const userData = docSnap.data();
-            setCustomerFirstName(userData.firstName || "Client");
+            setCustomerFirstName(userData.firstName || userName);
             setCustomerPhoto(userData.photo || null);
             setCustomerPhone(userData.number || null);
             setCustomerTariff(userData.tariff || 9.99);
           } else {
-            console.log("Aucun document trouvé dans Firestore !");
+            console.log("No document found in Firestore!");
+            setCustomerFirstName(userName);
           }
         } catch (error) {
-          console.error("Erreur lors de la récupération des données client :", error);
+          console.error("Error fetching customer data:", error);
+          setCustomerFirstName(userName);
         }
       } else {
-        console.log("Utilisateur non connecté");
+        console.log("User not logged in");
+        setCustomerFirstName(userName);
       }
     })();
-  }, []);
+  }, [userName]);
 
   useEffect(() => {
     (async () => {
@@ -292,7 +292,7 @@ const HomeScreenWithMap = () => {
         activity: "active",
         userId: auth.currentUser?.uid || null,
       };
-      await addDoc(collection(db, "rideRequests"), rideRequestData);
+      await addDoc(collection(firestore, "rideRequests"), rideRequestData);
       console.log("Ride request successfully sent.");
     } catch (error) {
       console.error("Error sending ride request:", error);
@@ -312,10 +312,14 @@ const HomeScreenWithMap = () => {
       setLoading(true);
       const location = details.geometry.location;
       const destinationCoords = { latitude: location.lat, longitude: location.lng };
+      
+      // Safely update recentSearches
       setRecentSearches((prev) => {
-        const newList = [data.description, ...prev.filter((s) => s !== data.description)];
+        const prevSearches = Array.isArray(prev) ? prev : [];
+        const newList = [data.description, ...prevSearches.filter((s) => s !== data.description)];
         return newList.slice(0, 3);
       });
+
       const originData = { latitude: fromLocation.latitude, longitude: fromLocation.longitude, address: pickupText };
       const destinationData = { latitude: destinationCoords.latitude, longitude: destinationCoords.longitude, address: data.description };
       await requestRide(originData, destinationData);
@@ -346,10 +350,14 @@ const HomeScreenWithMap = () => {
       if (data.status === "OK" && data.results && data.results.length > 0) {
         const location = data.results[0].geometry.location;
         const destinationCoords = { latitude: location.lat, longitude: location.lng };
+        
+        // Safely update recentSearches
         setRecentSearches((prev) => {
-          const newList = [searchText, ...prev.filter((s) => s !== searchText)];
+          const prevSearches = Array.isArray(prev) ? prev : [];
+          const newList = [searchText, ...prevSearches.filter((s) => s !== searchText)];
           return newList.slice(0, 3);
         });
+
         const originData = { latitude: fromLocation.latitude, longitude: fromLocation.longitude, address: pickupText };
         const destinationData = { latitude: destinationCoords.latitude, longitude: destinationCoords.longitude, address: searchText };
         await requestRide(originData, destinationData);
@@ -436,7 +444,7 @@ const HomeScreenWithMap = () => {
           };
           
           // Save to Firestore
-          await addDoc(collection(db, "rideRequests"), rideRequestData);
+          await addDoc(collection(firestore, "rideRequests"), rideRequestData);
           
           // Navigate to RideOptionsScreen
           navigation.navigate("RideOptionsScreen", {

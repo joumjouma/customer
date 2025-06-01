@@ -93,8 +93,8 @@ android {
         applicationId 'com.caval.app'
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "1.0.0"
+        versionCode 5
+        versionName "5.0.0"
     }
     signingConfigs {
         debug {
@@ -153,7 +153,7 @@ dependencies {
     implementation("com.facebook.react:react-android")
 
     // Import the Firebase BoM
-    implementation(platform('com.google.firebase:firebase-bom:33.13.0'))
+    implementation(platform('com.google.firebase:firebase-bom:32.7.2'))
 
     // Add Firebase Analytics
     implementation('com.google.firebase:firebase-analytics')

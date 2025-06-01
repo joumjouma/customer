@@ -23,6 +23,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { GOOGLE_MAPS_APIKEY } from "@env";
 import { StatusBar } from "expo-status-bar";
 import ProfilePicture from '../components/ProfilePicture';
+import * as Location from 'expo-location';
 
 // Create Theme Context
 const ThemeContext = React.createContext();
@@ -64,10 +65,23 @@ async function geocodeLatLng(lat, lng) {
     const data = await response.json();
     if (data.status === "OK" && data.results.length > 0) {
       return data.results[0].formatted_address;
-    } else {
-      console.error("Geocode API error:", data.status, data.error_message);
-      return "Address not found";
     }
+    
+    // Fallback to Expo's Location.reverseGeocodeAsync
+    const result = await Location.reverseGeocodeAsync({ latitude, longitude });
+    if (result && result.length > 0) {
+      const { street, name, city, region, country } = result[0];
+      let addressComponents = [];
+      if (street) addressComponents.push(street);
+      else if (name) addressComponents.push(name);
+      if (city) addressComponents.push(city);
+      if (region) addressComponents.push(region);
+      if (country) addressComponents.push(country);
+      return addressComponents.join(", ");
+    }
+    
+    console.error("Geocode API error:", data.status, data.error_message);
+    return "Address not found";
   } catch (error) {
     console.error("Error reverse-geocoding:", error);
     return "Error fetching address";
@@ -283,7 +297,7 @@ function ActivityScreen() {
       <View style={styles.cleanHeader}>
         <TouchableOpacity
           style={[styles.headerButton, { backgroundColor: colors.buttonBackground }]}
-          onPress={() => navigation.navigate("HomeScreenWithMap")}
+          onPress={() => navigation.navigate("HomeTabs")}
         >
           <Ionicons name="arrow-back" size={22} color={colors.textPrimary} />
         </TouchableOpacity>
@@ -312,7 +326,7 @@ function ActivityScreen() {
           </Text>
           <TouchableOpacity 
             style={[styles.newRideButton, { backgroundColor: colors.accent }]}
-            onPress={() => navigation.navigate("HomeScreenWithMap")}
+            onPress={() => navigation.navigate("HomeTabs")}
           >
             <Text style={styles.newRideButtonText}>Demander un taxi</Text>
           </TouchableOpacity>

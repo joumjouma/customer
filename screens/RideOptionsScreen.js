@@ -235,7 +235,7 @@ const RideOptionsScreen = () => {
     const rideRequestId = await createRideRequest(selectedRideType, selectedFare);
     if (rideRequestId) {
       setPaymentModalVisible(false);
-      navigation.navigate("FindingDriver", {
+      navigation.navigate("FindingDriverScreen", {
         rideType: selectedRideType,
         distance,
         duration,
@@ -282,16 +282,25 @@ const RideOptionsScreen = () => {
 
   // Updated fare calculation function with the new pricing structure
   const calculateFare = (distance, rideType) => {
-    const baseFare = rideType === 'Caval Privé' ? 500 : 300;
     const distanceInKm = distance; // Distance is already in kilometers
+    let baseFare = 0;
     let additionalFare = 0;
 
-    // Apply additional fare of 75 fdj per km for distances above 5 km
-    if (distanceInKm > 5) {
-      additionalFare = (distanceInKm - 5) * 75;
+    if (rideType === 'Caval Privé') {
+      baseFare = 400; // Initial price for 3km or less
+      if (distanceInKm > 3) {
+        additionalFare = (distanceInKm - 3) * 75;
+      }
+    } else if (rideType === 'Caval moto') {
+      baseFare = 150; // Initial price for 3km or less
+      if (distanceInKm > 3) {
+        additionalFare = (distanceInKm - 3) * 75;
+      }
     }
 
-    return baseFare + additionalFare;
+    const totalFare = baseFare + additionalFare;
+    // Round to the nearest 50
+    return Math.round(totalFare / 50) * 50;
   };
 
   return (
@@ -391,7 +400,7 @@ const RideOptionsScreen = () => {
           fare={cavalMotoFare}
           onSelect={() => handleRideSelection("Caval moto")}
           useMotoImage
-          maxPeople={2}
+          maxPeople={1}
         />
 
         {/* New Button to navigate to PaymentMethodsScreen */}

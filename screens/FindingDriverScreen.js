@@ -43,12 +43,20 @@ const FindingDriverScreen = () => {
   const [originAddress, setOriginAddress] = useState(origin?.address || "Chargement de l'adresse...");
   const [destinationAddress, setDestinationAddress] = useState(destination?.address || "Chargement de l'adresse...");
   
+  // Default location (Djibouti City coordinates)
+  const DEFAULT_LOCATION = {
+    latitude: 11.5890,
+    longitude: 43.1450,
+    latitudeDelta: 0.05,
+    longitudeDelta: 0.05,
+  };
+
   // Région initiale
   const [mapRegion, setMapRegion] = useState({
     latitude: origin?.latitude || 37.7749,
     longitude: origin?.longitude || -122.4194,
-    latitudeDelta: 0.04,
-    longitudeDelta: 0.04,
+    latitudeDelta: 0.05,
+    longitudeDelta: 0.05,
   });
 
   const mapRef = useRef(null);
@@ -107,18 +115,58 @@ const FindingDriverScreen = () => {
   useEffect(() => {
     const getCurrentLocation = async () => {
       if (!origin || !origin?.latitude || !origin?.longitude) {
-        const { status } = await Location.requestForegroundPermissionsAsync();
-        if (status !== "granted") {
-          console.log("Permission de localisation refusée");
-          return;
+        try {
+          // First check if location services are enabled
+          const enabled = await Location.hasServicesEnabledAsync();
+          if (!enabled) {
+            console.log("Location services are disabled, using default location");
+            setMapRegion(DEFAULT_LOCATION);
+            return;
+          }
+
+          // Then request permissions
+          const { status } = await Location.requestForegroundPermissionsAsync();
+          if (status !== "granted") {
+            console.log("Location permission denied, using default location");
+            setMapRegion(DEFAULT_LOCATION);
+            return;
+          }
+
+          // Try to get location with a timeout
+          const locationPromise = Location.getCurrentPositionAsync({
+            accuracy: Location.Accuracy.Low, // Use lower accuracy for better success rate
+            timeout: 5000 // 5 second timeout
+          });
+
+          // Create a timeout promise
+          const timeoutPromise = new Promise((_, reject) => {
+            setTimeout(() => reject(new Error('Location request timed out')), 5000);
+          });
+
+          // Race between location and timeout
+          const location = await Promise.race([locationPromise, timeoutPromise]);
+
+          if (location && location.coords) {
+            setMapRegion({
+              latitude: location.coords.latitude,
+              longitude: location.coords.longitude,
+              latitudeDelta: 0.05,
+              longitudeDelta: 0.05,
+            });
+          } else {
+            throw new Error('Invalid location data received');
+          }
+        } catch (error) {
+          console.log("Location error, using default location:", error);
+          setMapRegion(DEFAULT_LOCATION);
+          
+          // Show a non-blocking toast or message
+          Alert.alert(
+            "Information",
+            "Impossible d'obtenir votre position exacte. Utilisation d'une position par défaut.",
+            [{ text: "OK" }]
+          );
         }
-        const location = await Location.getCurrentPositionAsync({});
-        setMapRegion({
-          latitude: location.coords.latitude,
-          longitude: location.coords.longitude,
-          latitudeDelta: 0.04,
-          longitudeDelta: 0.04,
-        });
       }
     };
 
@@ -178,13 +226,27 @@ const FindingDriverScreen = () => {
     }
   };
 
+  // Force update map region when component mounts
+  useEffect(() => {
+    if (mapRef.current) {
+      const newRegion = {
+        latitude: origin?.latitude || 11.5890,
+        longitude: origin?.longitude || 43.1450,
+        latitudeDelta: 0.05,
+        longitudeDelta: 0.05,
+      };
+      setMapRegion(newRegion);
+      mapRef.current.animateToRegion(newRegion, 0);
+    }
+  }, []);
+
   // Appelée quand l'itinéraire est prêt
   const handleDirectionsReady = (result) => {
     if (result && result.coordinates && result.coordinates.length > 0) {
       setRouteCoords(result.coordinates);
       mapRef.current?.fitToCoordinates(result.coordinates, {
         edgePadding: { top: 5, right: 180, bottom: height * 0.5, left: 90 },
-        animated: true,
+        animated: true
       });
     }
   };
@@ -194,7 +256,7 @@ const FindingDriverScreen = () => {
     if (routeCoords.length > 0) {
       mapRef.current?.fitToCoordinates(routeCoords, {
         edgePadding: { top: 5, right: 180, bottom: height * 0.5, left: 90 },
-        animated: true,
+        animated: true
       });
     }
   };
@@ -273,10 +335,10 @@ const FindingDriverScreen = () => {
         console.log("No rideRequestId found, skipping Firestore update");
       }
       
-      console.log("Attempting to navigate to HomeScreenWithMap...");
+      console.log("Attempting to navigate to HomeTabs...");
       
       // Use a direct navigation approach
-      navigation.navigate("HomeScreenWithMap");
+      navigation.navigate("HomeTabs");
       
     } catch (error) {
       console.error("Error cancelling ride request:", error);
@@ -410,6 +472,7 @@ const FindingDriverScreen = () => {
           onRegionChangeComplete={(region) => setMapRegion(region)}
           showsUserLocation={true}
           showsMyLocationButton={true}
+          initialRegion={DEFAULT_LOCATION}
         >
           {/* Marqueur de départ */}
           {origin && (

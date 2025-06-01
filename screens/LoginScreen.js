@@ -30,6 +30,8 @@ import * as WebBrowser from 'expo-web-browser';
 import { auth, firestore } from "../firebase.config";
 import { LinearGradient } from "expo-linear-gradient";
 import CustomPhoneInput from "./CustomPhoneInput";
+import { FirebaseRecaptchaVerifierModal } from 'expo-firebase-recaptcha';
+import { firebaseConfig } from '../firebase.config';
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -39,7 +41,7 @@ function LoginScreen() {
   const [phoneNumber, setPhoneNumber] = useState("");
   const [fname, setFname] = useState("");
   const [lname, setLname] = useState("");
-  const [loginMethod, setLoginMethod] = useState("email"); // "email", "phone", or "google"
+  const [loginMethod, setLoginMethod] = useState("phone"); // Default to 'phone' for Téléphone tab
   const [isDarkMode, setIsDarkMode] = useState(true); // Default to dark mode
   const navigation = useNavigation();
   const [verificationId, setVerificationId] = useState('');
@@ -48,6 +50,7 @@ function LoginScreen() {
   const [error, setError] = useState('');
   const [showVerification, setShowVerification] = useState(false);
   const phoneInput = useRef(null);
+  const recaptchaVerifier = useRef(null);
 
   // Google Sign-In Configuration
   const [request, response, promptAsync] = Google.useIdTokenAuthRequest({
@@ -162,7 +165,7 @@ function LoginScreen() {
         await AsyncStorage.setItem('userData', JSON.stringify(userData));
         
         setLoading(false);
-        navigation.navigate("HomeScreenWithMap");
+        navigation.navigate("HomeTabs");
       } catch (error) {
         setLoading(false);
         console.log(error.message);
@@ -222,7 +225,7 @@ function LoginScreen() {
       await AsyncStorage.setItem('userCredentials', JSON.stringify(userData));
       
       setLoading(false);
-      navigation.navigate("HomeScreenWithMap");
+      navigation.navigate("HomeTabs");
     } catch (error) {
       setLoading(false);
       console.log(error);
@@ -257,8 +260,8 @@ function LoginScreen() {
         }
         verId = await phoneProvider.verifyPhoneNumber(formattedPhone, window.recaptchaVerifier);
       } else {
-        // For mobile platforms, use Firebase's native phone auth
-        verId = await phoneProvider.verifyPhoneNumber(formattedPhone);
+        // For mobile platforms, use expo-firebase-recaptcha
+        verId = await phoneProvider.verifyPhoneNumber(formattedPhone, recaptchaVerifier.current);
       }
       
       setVerificationId(verId);
@@ -346,7 +349,7 @@ function LoginScreen() {
         setVerificationCode('');
         setVerificationId('');
         
-        navigation.navigate("HomeScreenWithMap");
+        navigation.navigate("HomeTabs");
         return;
       }
       
@@ -408,7 +411,7 @@ function LoginScreen() {
       setVerificationCode('');
       setVerificationId('');
       
-      navigation.navigate("HomeScreenWithMap");
+      navigation.navigate("HomeTabs");
     } catch (err) {
       console.error('Error verifying code:', err);
       setLoading(false);
@@ -455,6 +458,11 @@ function LoginScreen() {
         <Ionicons name={isDarkMode ? "sunny" : "moon"} size={24} color="#fff" />
       </TouchableOpacity>
 
+      <FirebaseRecaptchaVerifierModal
+        ref={recaptchaVerifier}
+        firebaseConfig={firebaseConfig}
+      />
+
       <ScrollView contentContainerStyle={styles.scrollContainer}>
         <Image 
           style={styles.logo} 
@@ -468,22 +476,6 @@ function LoginScreen() {
             <TouchableOpacity 
               style={[
                 styles.tab, 
-                loginMethod === "email" && styles.activeTab
-              ]} 
-              onPress={() => {
-                setLoginMethod("email");
-                setShowVerification(false);
-                setError('');
-              }}
-            >
-              <Text style={[
-                styles.tabText, 
-                loginMethod === "email" && styles.activeTabText
-              ]}>Email</Text>
-            </TouchableOpacity>
-            <TouchableOpacity 
-              style={[
-                styles.tab, 
                 loginMethod === "phone" && styles.activeTab
               ]} 
               onPress={() => {
@@ -492,10 +484,38 @@ function LoginScreen() {
                 setError('');
               }}
             >
+              <Ionicons 
+                name="phone-portrait" 
+                size={20} 
+                color={loginMethod === "phone" ? "#ff9f43" : "#aaa"} 
+                style={styles.tabIcon}
+              />
               <Text style={[
                 styles.tabText, 
                 loginMethod === "phone" && styles.activeTabText
               ]}>Téléphone</Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={[
+                styles.tab, 
+                loginMethod === "email" && styles.activeTab
+              ]} 
+              onPress={() => {
+                setLoginMethod("email");
+                setShowVerification(false);
+                setError('');
+              }}
+            >
+              <Ionicons 
+                name="mail" 
+                size={20} 
+                color={loginMethod === "email" ? "#ff9f43" : "#aaa"} 
+                style={styles.tabIcon}
+              />
+              <Text style={[
+                styles.tabText, 
+                loginMethod === "email" && styles.activeTabText
+              ]}>Email</Text>
             </TouchableOpacity>
           </View>
 
@@ -568,13 +588,12 @@ function LoginScreen() {
                       textInputStyle={styles.phoneInputText}
                       codeTextStyle={styles.phoneCodeText}
                       defaultCode="DJ"
+                      placeholder="Numéro de téléphone"
                     />
                   </View>
-
-                  {/* Add reCAPTCHA container for web platform */}
-                  {Platform.OS === 'web' && (
-                    <View id="recaptcha-container" style={styles.recaptchaContainer} />
-                  )}
+                  <Text style={styles.infoText}>
+                    Vous n'avez pas besoin de créer un compte si vous vous connectez avec votre numéro de téléphone.
+                  </Text>
                 </>
               ) : (
                 <>
@@ -671,8 +690,9 @@ const styles = StyleSheet.create({
   },
   scrollContainer: {
     flexGrow: 1,
-    justifyContent: "center",
+    justifyContent: "flex-start",
     padding: 20,
+    paddingTop: 40,
   },
   themeToggle: {
     position: "absolute",
@@ -687,7 +707,7 @@ const styles = StyleSheet.create({
     height: undefined,
     aspectRatio: 1,
     alignSelf: "center",
-    marginBottom: 30,
+    marginBottom: 15,
   },
   card: {
     backgroundColor: "#1e1e1e",
@@ -699,6 +719,7 @@ const styles = StyleSheet.create({
     shadowRadius: 15,
     elevation: 8,
     marginHorizontal: 6,
+    marginTop: 5,
   },
   tabContainer: {
     flexDirection: "row",
@@ -710,8 +731,13 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingVertical: 12,
     alignItems: "center",
+    flexDirection: 'row',
+    justifyContent: 'center',
     borderBottomWidth: 2,
     borderBottomColor: "transparent",
+  },
+  tabIcon: {
+    marginRight: 8,
   },
   activeTab: {
     borderBottomColor: "#ff9f43",
@@ -748,15 +774,16 @@ const styles = StyleSheet.create({
     color: "#ff5252",
     marginBottom: 16,
     textAlign: "center",
+    fontSize: 14,
   },
   button: {
     backgroundColor: "#ff9f43",
-    paddingVertical: 15,
+    paddingVertical: 16,
     borderRadius: 12,
-    shadowColor: "#000",
-    shadowOpacity: 0.2,
-    shadowOffset: { width: 0, height: 3 },
-    shadowRadius: 6,
+    shadowColor: "#ff9f43",
+    shadowOpacity: 0.3,
+    shadowOffset: { width: 0, height: 4 },
+    shadowRadius: 8,
     elevation: 5,
     marginTop: 10,
   },
@@ -773,7 +800,7 @@ const styles = StyleSheet.create({
   },
   linkText: {
     textAlign: "center",
-    marginTop: 30,
+    marginTop: 20,
     fontSize: 16,
     color: "#aaa",
   },
@@ -791,7 +818,7 @@ const styles = StyleSheet.create({
   dividerContainer: {
     flexDirection: "row",
     alignItems: "center",
-    marginVertical: 20,
+    marginVertical: 25,
   },
   divider: {
     flex: 1,
@@ -805,9 +832,14 @@ const styles = StyleSheet.create({
   },
   googleButton: {
     backgroundColor: "#4285F4",
-    paddingVertical: 15,
+    paddingVertical: 16,
     borderRadius: 12,
     marginTop: 5,
+    shadowColor: "#4285F4",
+    shadowOpacity: 0.3,
+    shadowOffset: { width: 0, height: 4 },
+    shadowRadius: 8,
+    elevation: 5,
   },
   googleButtonContent: {
     flexDirection: "row",
@@ -836,19 +868,24 @@ const styles = StyleSheet.create({
     backgroundColor: "#2a2a2a",
     borderWidth: 1,
     borderColor: "#333",
+    overflow: 'hidden',
   },
   phoneTextContainer: {
     backgroundColor: "#2a2a2a",
     borderRadius: 12,
     paddingVertical: 0,
+    height: 55,
   },
   phoneInputText: {
     color: "#fff",
     fontSize: 16,
+    height: 55,
   },
   phoneCodeText: {
     color: "#aaa",
     fontSize: 14,
+    height: 55,
+    lineHeight: 55,
   },
   resendButton: {
     alignSelf: "center",
@@ -860,14 +897,12 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "500",
   },
-  keyboardAvoidingView: {
-    flex: 1,
-  },
-  recaptchaContainer: {
-    marginVertical: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-    minHeight: 60,
+  infoText: {
+    color: '#aaa',
+    fontSize: 13,
+    textAlign: 'center',
+    marginBottom: 10,
+    lineHeight: 18,
   },
 });
 

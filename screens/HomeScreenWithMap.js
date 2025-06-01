@@ -38,6 +38,7 @@ const HomeScreenWithMap = ({ userName = "User" }) => {
   const navigation = useNavigation();
   const route = useRoute();
   const [isSearchFocused, setIsSearchFocused] = useState(false);
+  const [listViewDisplayed, setListViewDisplayed] = useState(false);
 
   // Theme state – retained for other UI elements, but the map will use dark theme always.
   const [isDarkMode, setIsDarkMode] = useState(false);
@@ -84,7 +85,6 @@ const HomeScreenWithMap = ({ userName = "User" }) => {
 
   const [nearbyPlaces, setNearbyPlaces] = useState([]);
   const [loading, setLoading] = useState(false);
-
   const [recentSearches, setRecentSearches] = useState([]);
   const [searchText, setSearchText] = useState("");
 
@@ -538,7 +538,7 @@ const HomeScreenWithMap = ({ userName = "User" }) => {
         right: 0,
         padding: Platform.OS === "ios" ? 20 : 16,
         paddingTop: 10,
-        paddingBottom: Platform.OS === "ios" ? 100 : 0,
+        paddingBottom: Platform.OS === "ios" ? 100 : 16,
         backgroundColor: isDarkMode ? "#1E1E1E" : "#fff",
         borderTopLeftRadius: 24,
         borderTopRightRadius: 24,
@@ -549,7 +549,8 @@ const HomeScreenWithMap = ({ userName = "User" }) => {
         elevation: 8,
         maxHeight: "50%",
         zIndex: 5,
-        marginBottom: Platform.OS === 'android' ? -20 : 0,
+        marginBottom: Platform.OS === 'android' ? 0 : 0,
+        top: Platform.OS === 'android' ? height * 0.58 : undefined,
       },
       bottomContainerHeader: { alignItems: "center", marginBottom: 12 },
       dragHandle: {
@@ -594,8 +595,7 @@ const HomeScreenWithMap = ({ userName = "User" }) => {
         top: 52,
         left: 0,
         right: 0,
-        // This ensures the dropdown doesn't get hidden by bottom tabs
-        maxHeight: Math.min(300, height - 200 - (keyboardVisible ? 0 : 80)), 
+        maxHeight: Math.min(300, height - 200 - (keyboardVisible ? keyboardHeight : 80)), 
         zIndex: 9999,
       },
       // Custom row rendering: two lines with black font.
@@ -682,21 +682,21 @@ const HomeScreenWithMap = ({ userName = "User" }) => {
       goButtonText: { color: "#fff", fontSize: 15, fontWeight: "700" },
       recentSearchesContainer: {
         backgroundColor: isDarkMode ? "#2D2D2D" : "#F9FAFB",
-        padding: Platform.OS === "ios" ? 16 : 28,
+        padding: Platform.OS === "ios" ? 16 : 16,
         borderRadius: 16,
-        marginBottom: Platform.OS === "ios" ? 16 : 80,
-        marginTop: Platform.OS === "ios" ? 20 : 20,
+        marginBottom: Platform.OS === "ios" ? 16 : 16,
+        marginTop: Platform.OS === "ios" ? 20 : 12,
       },
       recentSearchesTitle: { 
         fontSize: 16, 
         fontWeight: "600", 
-        marginBottom: Platform.OS === "ios" ? 8 : 24, 
+        marginBottom: Platform.OS === "ios" ? 8 : 12, 
         color: isDarkMode ? "#E0E0E0" : "#1F2937" 
       },
       recentSearchItem: { 
         flexDirection: "row", 
         alignItems: "center", 
-        marginBottom: Platform.OS === "ios" ? 12 : 28 
+        marginBottom: Platform.OS === "ios" ? 12 : 16 
       },
       recentSearchText: { fontSize: 14, color: isDarkMode ? "#B0B0B0" : "#4B5563", flex: 1 },
       loadingContainer: { flexDirection: "row", alignItems: "center", marginTop: 20 },
@@ -774,7 +774,7 @@ const HomeScreenWithMap = ({ userName = "User" }) => {
                 showsMyLocationButton={false}
                 showsCompass={false}
                 rotateEnabled={false}
-                mapPadding={{ top: 5, right: 0, bottom: Platform.OS === 'ios' ? 350 : 450, left: 0 }}
+                mapPadding={{ top: 5, right: 0, bottom: Platform.OS === 'ios' ? 350 : 100, left: 0 }}
                 onPress={handleMapPress}
               >
                 {fromLocation && (
@@ -889,7 +889,7 @@ const HomeScreenWithMap = ({ userName = "User" }) => {
               <View style={styles.bottomContainerHeader}>
                 <View style={styles.dragHandle} />
               </View>
-
+              
               {!showPickupInput ? (
                 <View style={styles.rowContainer}>
                   <Text style={styles.greetingText}>
@@ -938,6 +938,7 @@ const HomeScreenWithMap = ({ userName = "User" }) => {
                           )}
                         </View>
                       )}
+                      predefinedPlaces={[]}
                       ListViewProps={{ showsVerticalScrollIndicator: true }}
                       styles={{
                         container: { ...styles.searchContainer, flex: 1 },
@@ -965,47 +966,57 @@ const HomeScreenWithMap = ({ userName = "User" }) => {
                 <View style={styles.destinationIconContainer}>
                   <Ionicons name="navigate-outline" size={20} color="#FF6F00" />
                 </View>
-                <GooglePlacesAutocomplete
-                  ref={googlePlacesRef}
-                  placeholder="Où souhaitez-vous aller ?"
-                  fetchDetails
-                  onPress={handleDestinationSelect}
-                  query={{
-                    key: GOOGLE_MAPS_APIKEY,
-                    language: "fr",
-                    components: "country:DJ",
-                  }}
-                  debounce={400}
-                  listViewDisplayed="auto"
-                  keyboardShouldPersistTaps="always"
-                  textInputProps={{
-                    value: searchText,
-                    onChangeText: setSearchText,
-                    placeholderTextColor: isDarkMode ? "#6B7280" : "#9CA3AF",
-                    onFocus: () => setIsSearchFocused(true),
-                    onBlur: () => setIsSearchFocused(false),
-                  }}
-                  renderRow={(data) => (
-                    <View style={styles.customAutocompleteRow}>
-                      <Text style={styles.customAutocompleteMainText}>
-                        {data.structured_formatting?.main_text || data.description}
-                      </Text>
-                      {data.structured_formatting?.secondary_text && (
-                        <Text style={styles.customAutocompleteSecondaryText}>
-                          {data.structured_formatting.secondary_text}
-                        </Text>
-                      )}
-                    </View>
-                  )}
-                  ListViewProps={{ showsVerticalScrollIndicator: true }}
-                  styles={{
-                    container: styles.destinationSearchContainer,
-                    textInput: styles.destinationSearchInput,
-                    listView: { ...styles.autocompleteListView, position: "absolute", top: 52, left: 0, right: 0 },
-                  }}
-                  enablePoweredByContainer={false}
-                  minLength={2}
-                />
+                <View style={{ flex: 1 }}>
+                  <GooglePlacesAutocomplete
+                    ref={googlePlacesRef}
+                    placeholder="Où souhaitez-vous aller ?"
+                    fetchDetails={true}
+                    onPress={handleDestinationSelect}
+                    query={{
+                      key: GOOGLE_MAPS_APIKEY,
+                      language: "fr",
+                      components: "country:DJ"
+                    }}
+                    debounce={400}
+                    listViewDisplayed={false}
+                    keyboardShouldPersistTaps="always"
+                    textInputProps={{
+                      value: searchText,
+                      onChangeText: setSearchText,
+                      placeholderTextColor: isDarkMode ? "#6B7280" : "#9CA3AF",
+                      onFocus: () => setIsSearchFocused(true),
+                      onBlur: () => setIsSearchFocused(false),
+                    }}
+                    predefinedPlaces={[]}
+                    ListViewProps={{ 
+                      showsVerticalScrollIndicator: true,
+                      keyboardShouldPersistTaps: "always"
+                    }}
+                    styles={{
+                      container: styles.destinationSearchContainer,
+                      textInput: styles.destinationSearchInput,
+                      listView: { ...styles.autocompleteListView, position: "absolute", top: 52, left: 0, right: 0 },
+                    }}
+                    enablePoweredByContainer={false}
+                    minLength={2}
+                    onFail={(error) => {
+                      console.log('GooglePlacesAutocomplete Error:', error);
+                      setSearchText('');
+                    }}
+                    onNotFound={() => {
+                      console.log('No results found');
+                      setSearchText('');
+                    }}
+                    enableHighAccuracyLocation={true}
+                    returnKeyType={'search'}
+                    textInputHide={false}
+                    nearbyPlacesAPI="GooglePlacesSearch"
+                    GooglePlacesDetailsQuery={{
+                      fields: "geometry,formatted_address"
+                    }}
+                    filterReverseGeocodingByTypes={['locality', 'administrative_area_level_3']}
+                  />
+                </View>
                 <View style={{ flexDirection: 'row' }}>
                   <TouchableOpacity style={styles.goButton} onPress={handleGoPress} disabled={loading || !searchText.trim()}>
                     <LinearGradient colors={["#FF9500", "#FF6F00"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.goButtonGradient}>

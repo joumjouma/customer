@@ -18,7 +18,7 @@ import {
 } from "react-native";
 import MapView, { Marker, PROVIDER_DEFAULT } from "react-native-maps";
 import MapViewDirections from "react-native-maps-directions";
-import { useRoute, useNavigation } from "@react-navigation/native";
+import { useRoute, useNavigation, CommonActions } from "@react-navigation/native";
 import { GOOGLE_MAPS_APIKEY } from "@env";
 import { doc, onSnapshot, updateDoc } from "firebase/firestore";
 import { firestore } from "../firebase.config";
@@ -33,7 +33,7 @@ import { createDriverCustomerConversation } from '../utils/conversation';
 const { height, width } = Dimensions.get("window");
 
 // Define overlay heights
-const COLLAPSED_HEIGHT = 200;
+const COLLAPSED_HEIGHT = 250;
 const EXPANDED_HEIGHT = height * 0.6;
 
 // Modern dark map style with orange accents
@@ -132,6 +132,9 @@ const DriverFoundScreen = () => {
   const [rideStatus, setRideStatus] = useState(null);
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [isCancelling, setIsCancelling] = useState(false);
+  const [showHelpModal, setShowHelpModal] = useState(false);
+  const [selectedReason, setSelectedReason] = useState(null);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
 
   const mapRef = useRef(null);
   const pulseAnimationRef = useRef(null);
@@ -147,9 +150,23 @@ const DriverFoundScreen = () => {
         const data = docSnap.data();
         setRideStatus(data.status);
         
-        // If ride is completed, navigate to HomeScreenWithMap
+        // If ride is completed, navigate to HomeTabs
         if (data.status === "completed") {
-          navigation.replace("HomeScreenWithMap");
+          navigation.dispatch(
+            CommonActions.reset({
+              index: 0,
+              routes: [
+                { 
+                  name: 'HomeTabs',
+                  state: {
+                    routes: [
+                      { name: 'Home' }
+                    ]
+                  }
+                }
+              ],
+            })
+          );
         }
       }
     });
@@ -394,19 +411,22 @@ const DriverFoundScreen = () => {
     navigation.goBack();
   };
 
-  const handleCancelRide = async () => {
+  const handleCancelRide = async (reason) => {
     setIsCancelling(true);
     try {
       // Update ride status in Firestore
-      const rideRequestRef = doc(db, "rideRequests", rideId);
+      const rideRequestRef = doc(firestore, "rideRequests", rideId);
       await updateDoc(rideRequestRef, {
         status: "declined",
         cancelledAt: new Date(),
-        cancelledBy: "customer"
+        cancelledBy: "customer",
+        cancellationReason: reason
       });
       
       // Navigate back to home screen
-      navigation.replace("HomeScreenWithMap");
+      navigation.navigate('HomeTabs', {
+        screen: 'Home'
+      });
     } catch (error) {
       console.error("Error cancelling ride:", error);
       Alert.alert(
@@ -416,6 +436,8 @@ const DriverFoundScreen = () => {
     } finally {
       setIsCancelling(false);
       setShowCancelModal(false);
+      setShowConfirmModal(false);
+      setSelectedReason(null);
     }
   };
 
@@ -497,10 +519,11 @@ const DriverFoundScreen = () => {
               coordinate={origin} 
               anchor={{ x: 0.5, y: 0.5 }} 
               tracksViewChanges={false}
+              zIndex={1000}
             >
-              <View style={styles.originMarkerContainer}>
-                <View style={styles.originMarkerDot} />
-                <Text style={styles.markerAddressPill} numberOfLines={1}>
+              <View style={[styles.originMarkerContainer, { elevation: 5 }]}>
+                <View style={[styles.originMarkerDot, { elevation: 5 }]} />
+                <Text style={[styles.markerAddressPill, { elevation: 5 }]} numberOfLines={1}>
                   {originAddress || "Départ"}
                 </Text>
               </View>
@@ -514,12 +537,13 @@ const DriverFoundScreen = () => {
               coordinate={destinationData} 
               anchor={{ x: 0.5, y: 1 }} 
               tracksViewChanges={false}
+              zIndex={1000}
             >
-              <View style={styles.destinationMarkerContainer}>
-                <View style={styles.destinationPin}>
+              <View style={[styles.destinationMarkerContainer, { elevation: 5 }]}>
+                <View style={[styles.destinationPin, { elevation: 5 }]}>
                   <Ionicons name="location" size={20} color="#fff" />
                 </View>
-                <Text style={styles.destinationAddressPill} numberOfLines={1}>
+                <Text style={[styles.destinationAddressPill, { elevation: 5 }]} numberOfLines={1}>
                   {destinationData?.address || "Destination"}
                 </Text>
               </View>
@@ -672,10 +696,10 @@ const DriverFoundScreen = () => {
               
               <TouchableOpacity 
                 style={styles.actionButton}
-                onPress={() => setShowCancelModal(true)}
+                onPress={() => setShowHelpModal(true)}
               >
-                <Ionicons name="close-circle" size={20} color={THEME.error} />
-                <Text style={styles.actionButtonText}>Annuler</Text>
+                <Ionicons name="help-circle" size={20} color={THEME.warning} />
+                <Text style={styles.actionButtonText}>Besoin d'aide ?</Text>
               </TouchableOpacity>
             </View>
 
@@ -731,7 +755,7 @@ const DriverFoundScreen = () => {
                     </View>
                     <View style={styles.tripInfoContent}>
                       <Text style={styles.tripInfoLabel}>Tarif</Text>
-                      <Text style={styles.tripInfoValue}>{fare ? `${fare} €` : '--'}</Text>
+                      <Text style={styles.tripInfoValue}>{fare ? `${fare} fdj` : '--'}</Text>
                     </View>
                   </View>
                 </View>
@@ -798,12 +822,70 @@ const DriverFoundScreen = () => {
           </View>
         </Animated.View>
         
-        {/* Cancel Ride Modal */}
+        {/* Help Modal for reasons */}
         <Modal
-          visible={showCancelModal}
+          visible={showHelpModal}
           transparent={true}
           animationType="fade"
-          onRequestClose={() => setShowCancelModal(false)}
+          onRequestClose={() => setShowHelpModal(false)}
+        >
+          <BlurView intensity={95} style={styles.modalBlurContainer} tint="dark">
+            <View style={styles.modalContainer}>
+              <View style={styles.modalCard}>
+                <View style={styles.modalHeader}>
+                  <MaterialIcons name="help-outline" size={40} color={THEME.warning} />
+                  <Text style={styles.modalTitle}>Pourquoi avez-vous besoin d'aide ?</Text>
+                </View>
+                <View style={{ marginVertical: 20 }}>
+                  {[
+                    "Le chauffeur ne se présente pas",
+                    "Problème avec le véhicule",
+                    "Changement de destination",
+                    "Autre"
+                  ].map((reason, idx) => (
+                    <TouchableOpacity
+                      key={reason}
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        marginBottom: 15,
+                        backgroundColor: selectedReason === reason ? THEME.primary : 'transparent',
+                        borderRadius: 8,
+                        padding: 10,
+                      }}
+                      onPress={() => setSelectedReason(reason)}
+                    >
+                      <Ionicons name={selectedReason === reason ? 'radio-button-on' : 'radio-button-off'} size={22} color={THEME.primary} style={{ marginRight: 10 }} />
+                      <Text style={{ color: THEME.text, fontSize: 16 }}>{reason}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+                <View style={styles.modalButtons}>
+                  <TouchableOpacity
+                    style={[styles.modalButton, styles.modalCancelButton]}
+                    onPress={() => { setShowHelpModal(false); setSelectedReason(null); }}
+                  >
+                    <Text style={styles.modalButtonText}>Retour</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.modalButton, styles.modalConfirmButton]}
+                    onPress={() => { if (selectedReason) { setShowHelpModal(false); setShowConfirmModal(true); } }}
+                    disabled={!selectedReason}
+                  >
+                    <Text style={styles.modalButtonText}>Continuer</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+          </BlurView>
+        </Modal>
+
+        {/* Confirm Cancel Modal */}
+        <Modal
+          visible={showConfirmModal}
+          transparent={true}
+          animationType="fade"
+          onRequestClose={() => setShowConfirmModal(false)}
         >
           <BlurView intensity={95} style={styles.modalBlurContainer} tint="dark">
             <View style={styles.modalContainer}>
@@ -812,23 +894,24 @@ const DriverFoundScreen = () => {
                   <MaterialIcons name="error-outline" size={40} color={THEME.warning} />
                   <Text style={styles.modalTitle}>Annuler la course ?</Text>
                 </View>
-                
                 <Text style={styles.modalMessage}>
-                  Votre chauffeur est déjà en route. Des frais d'annulation peuvent s'appliquer.
+                  Annuler plus de 3 fois entraînera le bannissement de votre compte Caval.
                 </Text>
-                
                 <View style={styles.modalButtons}>
-                  <TouchableOpacity 
+                  <TouchableOpacity
                     style={[styles.modalButton, styles.modalCancelButton]}
-                    onPress={() => setShowCancelModal(false)}
+                    onPress={() => { setShowConfirmModal(false); setSelectedReason(null); }}
                     disabled={isCancelling}
                   >
                     <Text style={styles.modalButtonText}>Retour</Text>
                   </TouchableOpacity>
-                  
-                  <TouchableOpacity 
+                  <TouchableOpacity
                     style={[styles.modalButton, styles.modalConfirmButton]}
-                    onPress={handleCancelRide}
+                    onPress={async () => {
+                      setShowConfirmModal(false);
+                      await handleCancelRide(selectedReason);
+                      setSelectedReason(null);
+                    }}
                     disabled={isCancelling}
                   >
                     {isCancelling ? (
@@ -919,6 +1002,7 @@ const styles = StyleSheet.create({
   },
   originMarkerContainer: {
     alignItems: "center",
+    backgroundColor: 'transparent',
   },
   originMarkerDot: {
     width: 16,
@@ -942,6 +1026,7 @@ const styles = StyleSheet.create({
   },
   destinationMarkerContainer: {
     alignItems: "center",
+    backgroundColor: 'transparent',
   },
   destinationPin: {
     backgroundColor: THEME.primary,
@@ -954,7 +1039,6 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
     shadowRadius: 3.84,
-    elevation: 5,
   },
   destinationAddressPill: {
     backgroundColor: "rgba(30, 30, 30, 0.85)",
@@ -1108,10 +1192,11 @@ const styles = StyleSheet.create({
   // Bottom Overlay
   overlayContainer: {
     position: "absolute",
-    bottom: 0,
+    bottom: 30,
     left: 0,
     right: 0,
     height: COLLAPSED_HEIGHT,
+    transform: [{ translateY: 0 }],
   },
   overlay: {
     flex: 1,

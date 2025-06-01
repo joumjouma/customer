@@ -2,7 +2,7 @@
   "expo": {
     "name": "Caval",
     "slug": "caval",
-    "version": "1.0.0",
+    "version": "5.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
@@ -16,7 +16,7 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.caval.courier.ios",
       "googleServicesFile": "./GoogleService-Info.plist",
-      "buildNumber": "1",
+      "buildNumber": "5",
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "Caval needs access to your location to find nearby drivers and show your position on the map.",
         "NSLocationAlwaysUsageDescription": "Caval needs access to your location to find nearby drivers and show your position on the map.",
@@ -29,7 +29,7 @@
     },
     "android": {
       "package": "com.caval.app",
-      "versionCode": 1,
+      "versionCode": 5,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"

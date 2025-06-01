@@ -315,14 +315,14 @@ const ModifyFieldScreen = () => {
               <View style={styles.inputContainer}>
                 <View style={styles.inputLabelRow}>
                   <Ionicons name={getIconName()} size={18} color="#FF6F00" />
-                  <Text style={styles.label}>Nouveau {title}</Text>
+                  <Text style={styles.label}>{title}</Text>
                 </View>
                 <TextInput
                   style={styles.input}
                   value={value}
                   onChangeText={setValue}
                   autoCapitalize={field === "name" ? "words" : "none"}
-                  placeholder={`Entrez le nouveau ${title.toLowerCase()}`}
+                  placeholder={` ${title.toLowerCase()}`}
                   placeholderTextColor="#666"
                   keyboardType={
                     field === "email"

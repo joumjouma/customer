@@ -23,6 +23,7 @@ import Ionicons from "react-native-vector-icons/Ionicons";
 import { LinearGradient } from "expo-linear-gradient";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import ProfilePicture from '../components/ProfilePicture';
+import { uploadImage, generateImagePath } from '../utils/storage';
 
 // Create ThemeContext
 const ThemeContext = React.createContext();
@@ -185,7 +186,7 @@ function Profile() {
       if (!result.canceled) {
         setLoading(true);
         const imageUri = result.assets[0].uri;
-        
+
         // Get the current authenticated user
         const currentUser = auth.currentUser;
         if (!currentUser) {
@@ -194,16 +195,26 @@ function Profile() {
           return;
         }
 
-        // Update the user document with the new photo URL
+        // Convert the image URI to a blob (required for Firebase Storage)
+        const response = await fetch(imageUri);
+        const blob = await response.blob();
+
+        // Generate a storage path
+        const imagePath = generateImagePath(currentUser.uid, 'profile.jpg');
+
+        // Upload to Firebase Storage
+        const downloadURL = await uploadImage(blob, imagePath);
+
+        // Update the user document with the new photo URL (downloadURL)
         const docRef = doc(firestore, "Customers", currentUser.uid);
         await updateDoc(docRef, {
-          photo: imageUri
+          photo: downloadURL
         });
 
         // Update local state
         setUserDetails(prev => ({
           ...prev,
-          photo: imageUri
+          photo: downloadURL
         }));
 
         Alert.alert('Success', 'Profile picture updated successfully');
@@ -229,7 +240,7 @@ function Profile() {
   };
 
   const navigateToAccountScreen = () => {
-    navigation.navigate("accountScreen");
+    navigation.navigate("AccountScreen");
   };
 
   if (loading) {
@@ -338,7 +349,7 @@ function Profile() {
         <View style={styles.servicesGrid}>
           <TouchableOpacity
             style={[styles.serviceCard, { backgroundColor: theme.serviceCardBackground }]}
-            onPress={() => navigation.navigate("accountScreen")}
+            onPress={() => navigation.navigate("AccountScreen")}
           >
             <View style={styles.serviceIconContainer}>
               <Ionicons name="person" size={24} color={theme.serviceIcon} />

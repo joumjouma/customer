@@ -97,7 +97,7 @@ function RegisterScreen() {
       );
       
       Alert.alert("Succès", "Connecté avec Google avec succès !");
-      navigation.navigate("HomeScreenWithMap");
+      navigation.navigate("HomeTabs");
     } catch (error) {
       console.error(error);
       Alert.alert("Erreur", error.message);
@@ -159,7 +159,7 @@ function RegisterScreen() {
         authProvider: "phone",
       }, { merge: true });
 
-      navigation.navigate("HomeScreenWithMap");
+      navigation.navigate("HomeTabs");
     } catch (err) {
       console.error('Error verifying code:', err);
       setError(err.message || 'Failed to verify code');

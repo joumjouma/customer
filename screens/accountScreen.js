@@ -59,6 +59,12 @@ const AccountScreen = () => {
           title: "Modifier le nom",
         });
         break;
+      case "Modifier l'email":
+        navigation.navigate("ModifyFieldScreen", {
+          field: "email",
+          title: "Modifier l'email",
+        });
+        break;
       case "Ajouter/Modifier le numéro de téléphone":
         navigation.navigate("ModifyFieldScreen", {
           field: "phone",
@@ -156,6 +162,20 @@ const AccountScreen = () => {
 
         <TouchableOpacity 
           style={styles.optionItem} 
+          onPress={() => handleOptionPress("Modifier l'email")}
+        >
+          <View style={styles.optionIconContainer}>
+            <Ionicons name="mail-outline" size={22} color="#FF6F00" />
+          </View>
+          <View style={styles.optionTextContainer}>
+            <Text style={styles.optionText}>Modifier l'email</Text>
+            <Text style={styles.optionSubtext}>Mettre à jour votre adresse email</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={22} color="#666" />
+        </TouchableOpacity>
+
+        <TouchableOpacity 
+          style={styles.optionItem} 
           onPress={() => handleOptionPress("Ajouter/Modifier le numéro de téléphone")}
         >
           <View style={styles.optionIconContainer}>
@@ -197,6 +217,13 @@ const AccountScreen = () => {
           </View>
           <Ionicons name="chevron-forward" size={22} color="#666" />
         </TouchableOpacity>
+
+        <View style={styles.footer}>
+          <Text style={styles.footerText}>CAVAL Inc. © 2025</Text>
+          <Text style={styles.footerSubtext}>Tous droits réservés</Text>
+          <Text style={styles.footerSubtext}>Version 2.1.0</Text>
+          <Text style={styles.footerSubtext}>Djibouti, République de Djibouti</Text>
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -381,5 +408,24 @@ const styles = StyleSheet.create({
       android: "Roboto",
       default: "System",
     }),
+  },
+  footer: {
+    marginTop: 40,
+    marginBottom: 20,
+    alignItems: 'center',
+    paddingTop: 20,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  footerText: {
+    fontSize: 16,
+    color: '#FF6F00',
+    fontWeight: '600',
+    marginBottom: 8,
+  },
+  footerSubtext: {
+    fontSize: 13,
+    color: '#666',
+    marginBottom: 4,
   },
 });

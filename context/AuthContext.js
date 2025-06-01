@@ -1,12 +1,15 @@
-import React, { createContext, useState, useEffect, useContext } from 'react';
-import { auth } from '../screens/firebase';
+import React, { createContext, useState, useContext, useEffect } from 'react';
+import { auth } from '../firebase.config';
 import { onAuthStateChanged } from 'firebase/auth';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Create the context
-const AuthContext = createContext();
+const AuthContext = createContext({});
 
 // Custom hook to use the auth context
-export const useAuth = () => useContext(AuthContext);
+export const useAuth = () => {
+  return useContext(AuthContext);
+};
 
 // Provider component
 export const AuthProvider = ({ children }) => {
@@ -14,14 +17,45 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Subscribe to auth state changes
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      setUser(currentUser);
-      setLoading(false);
+    // First try to get stored auth state
+    const checkStoredAuth = async () => {
+      try {
+        const storedUser = await AsyncStorage.getItem('user');
+        if (storedUser) {
+          setUser(JSON.parse(storedUser));
+        }
+      } catch (error) {
+        console.error('Error reading stored auth:', error);
+      }
+    };
+
+    checkStoredAuth();
+
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      try {
+        if (user) {
+          const userData = {
+            uid: user.uid,
+            email: user.email,
+            displayName: user.displayName,
+          };
+          await AsyncStorage.setItem('user', JSON.stringify(userData));
+          setUser(userData);
+        } else {
+          await AsyncStorage.removeItem('user');
+          setUser(null);
+        }
+      } catch (error) {
+        console.error('Auth error:', error);
+        setUser(null);
+      } finally {
+        setLoading(false);
+      }
     });
 
-    // Cleanup subscription on unmount
-    return unsubscribe;
+    return () => {
+      unsubscribe();
+    };
   }, []);
 
   // Context value

@@ -249,22 +249,8 @@ function LoginScreen() {
       
       // Use Firebase's built-in phone auth
       const phoneProvider = new PhoneAuthProvider(auth);
-      
-      let verId;
-      if (Platform.OS === 'web') {
-        // For web platform, use reCAPTCHA verifier
-        if (!window.recaptchaVerifier) {
-          setError('Erreur de configuration reCAPTCHA. Veuillez réessayer.');
-          setLoading(false);
-          return;
-        }
-        verId = await phoneProvider.verifyPhoneNumber(formattedPhone, window.recaptchaVerifier);
-      } else {
-        // For mobile platforms, use expo-firebase-recaptcha
-        verId = await phoneProvider.verifyPhoneNumber(formattedPhone, recaptchaVerifier.current);
-      }
-      
-      setVerificationId(verId);
+      const verificationId = await phoneProvider.verifyPhoneNumber(formattedPhone);
+      setVerificationId(verificationId);
       setShowVerification(true);
       
       // Alert the user that the code has been sent
@@ -278,16 +264,6 @@ function LoginScreen() {
         setError('Numéro de téléphone invalide. Veuillez vérifier et réessayer.');
       } else if (err.code === 'auth/too-many-requests') {
         setError('Trop de tentatives. Veuillez réessayer plus tard.');
-      } else if (err.code === 'auth/captcha-check-failed') {
-        setError('Vérification reCAPTCHA échouée. Veuillez réessayer.');
-        if (Platform.OS === 'web' && window.recaptchaVerifier) {
-          window.recaptchaVerifier.clear();
-          window.recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
-            'size': 'invisible',
-            'callback': () => console.log('reCAPTCHA verified'),
-            'expired-callback': () => console.log('reCAPTCHA expired')
-          });
-        }
       } else {
         setError(err.message || 'Échec de l\'envoi du code de vérification');
       }

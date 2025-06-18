@@ -42,7 +42,7 @@ function LoginScreen() {
   const [fname, setFname] = useState("");
   const [lname, setLname] = useState("");
   const [loginMethod, setLoginMethod] = useState("phone"); // Default to 'phone' for Téléphone tab
-  const [isDarkMode, setIsDarkMode] = useState(true); // Default to dark mode
+  const [isDarkMode, setIsDarkMode] = useState(Platform.OS === 'android' ? true : false); // Default to dark mode for Android
   const navigation = useNavigation();
   const [verificationId, setVerificationId] = useState('');
   const [verificationCode, setVerificationCode] = useState('');
@@ -96,9 +96,14 @@ function LoginScreen() {
       const savedTheme = await AsyncStorage.getItem("themePreference");
       if (savedTheme !== null) {
         setIsDarkMode(savedTheme === "dark");
+      } else {
+        // If no saved preference, use platform-specific default
+        setIsDarkMode(Platform.OS === 'android' ? true : false);
       }
     } catch (error) {
       console.log("Error loading theme preference:", error);
+      // On error, fallback to platform-specific default
+      setIsDarkMode(Platform.OS === 'android' ? true : false);
     }
   };
 
@@ -249,8 +254,22 @@ function LoginScreen() {
       
       // Use Firebase's built-in phone auth
       const phoneProvider = new PhoneAuthProvider(auth);
-      const verificationId = await phoneProvider.verifyPhoneNumber(formattedPhone);
-      setVerificationId(verificationId);
+      
+      let verId;
+      if (Platform.OS === 'web') {
+        // For web platform, use reCAPTCHA verifier
+        if (!window.recaptchaVerifier) {
+          setError('Erreur de configuration reCAPTCHA. Veuillez réessayer.');
+          setLoading(false);
+          return;
+        }
+        verId = await phoneProvider.verifyPhoneNumber(formattedPhone, window.recaptchaVerifier);
+      } else {
+        // For mobile platforms, use expo-firebase-recaptcha
+        verId = await phoneProvider.verifyPhoneNumber(formattedPhone, recaptchaVerifier.current);
+      }
+      
+      setVerificationId(verId);
       setShowVerification(true);
       
       // Alert the user that the code has been sent
@@ -264,6 +283,16 @@ function LoginScreen() {
         setError('Numéro de téléphone invalide. Veuillez vérifier et réessayer.');
       } else if (err.code === 'auth/too-many-requests') {
         setError('Trop de tentatives. Veuillez réessayer plus tard.');
+      } else if (err.code === 'auth/captcha-check-failed') {
+        setError('Vérification reCAPTCHA échouée. Veuillez réessayer.');
+        if (Platform.OS === 'web' && window.recaptchaVerifier) {
+          window.recaptchaVerifier.clear();
+          window.recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
+            'size': 'invisible',
+            'callback': () => console.log('reCAPTCHA verified'),
+            'expired-callback': () => console.log('reCAPTCHA expired')
+          });
+        }
       } else {
         setError(err.message || 'Échec de l\'envoi du code de vérification');
       }
@@ -421,10 +450,10 @@ function LoginScreen() {
 
   return (
     <LinearGradient
-      colors={isDarkMode ? ['#1a1a1a', '#2d2d2d'] : ['#ffffff', '#f0f0f0']}
-      style={styles.container}
+      colors={isDarkMode ? ['#121212', '#1a1a1a'] : ['#ffffff', '#f0f0f0']}
+      style={[styles.container, { backgroundColor: isDarkMode ? '#121212' : '#ffffff' }]}
     >
-      <StatusBar barStyle="light-content" />
+      <StatusBar barStyle={isDarkMode ? "light-content" : "dark-content"} />
       
       <TouchableOpacity 
         style={styles.themeToggle} 
@@ -663,12 +692,14 @@ function LoginScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: '#121212', // Default dark background
   },
   scrollContainer: {
     flexGrow: 1,
     justifyContent: "flex-start",
     padding: 20,
-    paddingTop: 40,
+    paddingTop: Platform.OS === 'android' ? -20 : 40, // Negative padding for Android
+    backgroundColor: 'transparent',
   },
   themeToggle: {
     position: "absolute",
@@ -683,7 +714,7 @@ const styles = StyleSheet.create({
     height: undefined,
     aspectRatio: 1,
     alignSelf: "center",
-    marginBottom: 15,
+    marginBottom: Platform.OS === 'android' ? -25 : 15, // Increased negative margin for Android
   },
   card: {
     backgroundColor: "#1e1e1e",
@@ -695,7 +726,7 @@ const styles = StyleSheet.create({
     shadowRadius: 15,
     elevation: 8,
     marginHorizontal: 6,
-    marginTop: 5,
+    marginTop: Platform.OS === 'android' ? -40 : 5, // Much larger negative margin for Android
   },
   tabContainer: {
     flexDirection: "row",
@@ -776,7 +807,7 @@ const styles = StyleSheet.create({
   },
   linkText: {
     textAlign: "center",
-    marginTop: 20,
+    marginTop: Platform.OS === 'android' ? 15 : 20, // Positive margin to move text lower
     fontSize: 16,
     color: "#aaa",
   },

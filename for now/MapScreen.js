@@ -1,12 +1,14 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { StyleSheet, View, TouchableOpacity, Text, Alert } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import MapView, { Marker, Polyline } from 'react-native-maps';
 import { GooglePlacesAutocomplete } from 'react-native-google-places-autocomplete';
 import { Ionicons } from '@expo/vector-icons';
-import { GOOGLE_MAPS_APIKEY } from '@env';
 import axios from 'axios';
 import NavigateCard from '../components/NavigateCard';
+
+// Use the same API key as other screens
+const GOOGLE_API_KEY = 'AIzaSyBnVN-ACYzcA0Sy8BcPLpXG50Y9T8jhJGE';
 
 const MapScreen = () => {
   const [region, setRegion] = useState({
@@ -26,7 +28,7 @@ const MapScreen = () => {
       return;
     }
 
-    const url = `https://maps.googleapis.com/maps/api/directions/json?origin=${fromLocation.latitude},${fromLocation.longitude}&destination=${toLocation.latitude},${toLocation.longitude}&key=${GOOGLE_MAPS_APIKEY}`;
+    const url = `https://maps.googleapis.com/maps/api/directions/json?origin=${fromLocation.latitude},${fromLocation.longitude}&destination=${toLocation.latitude},${toLocation.longitude}&key=${GOOGLE_API_KEY}`;
 
     try {
       console.log('Fetching directions from URL:', url);
@@ -128,7 +130,7 @@ const MapScreen = () => {
             }
           }}
           query={{
-            key: GOOGLE_MAPS_APIKEY,
+            key: GOOGLE_API_KEY,
             language: 'en',
           }}
           styles={styles.searchInput}
@@ -152,7 +154,7 @@ const MapScreen = () => {
             }
           }}
           query={{
-            key: GOOGLE_MAPS_APIKEY,
+            key: GOOGLE_API_KEY,
             language: 'en',
           }}
           styles={styles.searchInput}

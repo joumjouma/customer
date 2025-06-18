@@ -85,7 +85,7 @@ function HomeTabs() {
           backgroundColor: "#1e1e1e",
           borderTopColor: "transparent",
           position: "absolute",
-          bottom: 25,
+          bottom: Platform.OS === 'android' ? 40 : 25,
           left: 20,
           right: 20,
           height: 65,

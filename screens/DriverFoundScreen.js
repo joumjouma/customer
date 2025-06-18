@@ -609,6 +609,16 @@ const DriverFoundScreen = () => {
           </View>
         </View>
 
+        {/* Notification about driver arrival - moved to top */}
+        <View style={styles.topNotificationContainer}>
+          <View style={styles.notificationIconContainer}>
+            <Ionicons name="notifications" size={16} color={THEME.primary} />
+          </View>
+          <Text style={styles.notificationText}>
+            Vous serez contacté lorsque le chauffeur arrivera
+          </Text>
+        </View>
+
         {/* Bottom Sheet Overlay */}
         <Animated.View style={[styles.overlayContainer, { height: overlayHeightAnim }]}>
           <View style={styles.overlay}>
@@ -1187,6 +1197,40 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "700",
     color: THEME.text,
+  },
+  
+  // Notification about driver arrival - moved to top
+  topNotificationContainer: {
+    position: "absolute",
+    top: Platform.OS === "ios" ? 110 : 100,
+    right: 16,
+    left: 200,
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(30, 30, 30, 0.9)",
+    padding: 12,
+    borderRadius: 12,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  notificationIconContainer: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: "rgba(255, 107, 0, 0.2)",
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 12,
+  },
+  notificationText: {
+    flex: 1,
+    fontSize: 14,
+    color: THEME.text,
+    fontWeight: "500",
+    lineHeight: 20,
   },
   
   // Bottom Overlay

@@ -13,7 +13,6 @@ import MapView, { Marker } from "react-native-maps";
 import MapViewDirections from "react-native-maps-directions";
 import { useRoute, useNavigation } from "@react-navigation/native";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
-import { GOOGLE_MAPS_APIKEY } from "@env";
 import { collection, addDoc, serverTimestamp, query, where, getDocs, limit, getDoc, doc } from "firebase/firestore";
 import { firestore } from "../firebase.config";
 import { getAuth } from "firebase/auth";
@@ -21,6 +20,9 @@ import { getAuth } from "firebase/auth";
 // Your custom pin and Caval Moto icon
 import CustomPin from "../assets/CustomPin.png";
 import CavalMotoIcon from "../assets/clipart1667936.png";
+
+// Use the same API key as HomeScreenWithMap
+const GOOGLE_API_KEY = 'AIzaSyBnVN-ACYzcA0Sy8BcPLpXG50Y9T8jhJGE';
 
 const RideOptionsScreen = () => {
   const route = useRoute();
@@ -32,7 +34,7 @@ const RideOptionsScreen = () => {
   }, [navigation]);
 
   // Retrieve origin and destination (including addresses) from HomeScreenWithMap
-  const { origin, destination, customerFirstName, customerPhoto, customerPhone } = route.params || {};
+  const { origin, destination, customerFirstName, customerPhoto, customerPhone, distance: passedDistance } = route.params || {};
 
   // Reference for MapView
   const mapRef = useRef(null);
@@ -53,7 +55,9 @@ const RideOptionsScreen = () => {
   };
 
   // States for distance, duration, and fares
-  const [distance, setDistance] = useState(0); // km
+  const [distance, setDistance] = useState(
+    typeof passedDistance === 'number' && !isNaN(passedDistance) ? passedDistance : 0
+  ); // km - use passed distance as initial value
   const [duration, setDuration] = useState(0); // minutes
   const [cavalPriveFare, setCavalPriveFare] = useState(0);
   const [cavalMotoFare, setCavalMotoFare] = useState(0);
@@ -64,10 +68,18 @@ const RideOptionsScreen = () => {
   const [paymentModalVisible, setPaymentModalVisible] = useState(false);
   const [selectedRideType, setSelectedRideType] = useState(null);
 
-  // Load payment methods on screen load
+  // Load payment methods on screen load and calculate initial fares
   useEffect(() => {
     fetchPaymentMethods();
-  }, []);
+    
+    // Calculate initial fares using passed distance
+    if (passedDistance) {
+      const cavalPriveFare = calculateFare(passedDistance, 'Caval Privé');
+      const cavalMotoFare = calculateFare(passedDistance, 'Caval moto');
+      setCavalPriveFare(cavalPriveFare);
+      setCavalMotoFare(cavalMotoFare);
+    }
+  }, [passedDistance]);
 
   // Format arrival time (e.g., "3:15 PM")
   const getFormattedArrivalTime = (extraMinutes) => {
@@ -81,46 +93,60 @@ const RideOptionsScreen = () => {
     return `${hours}:${paddedMinutes} ${ampm}`;
   };
 
-  // When directions are ready, update metrics and fares
+  // When directions are ready, update metrics and fares (only if MapViewDirections provides better data)
   const handleDirectionsReady = (result) => {
-    // Remove the fitToCoordinates call to prevent automatic zooming
     setRouteCoordinates(result.coordinates);
-    setDistance(result.distance);
+    
+    // Only update distance if MapViewDirections provides a valid distance and it's different from passed distance
+    if (result.distance && result.distance > 0) {
+      setDistance(result.distance);
+    }
+    
     setDuration(result.duration);
     
-    // Calculate fares using the pricing structure
-    const cavalPriveFare = calculateFare(result.distance, 'Caval Privé');
-    const cavalMotoFare = calculateFare(result.distance, 'Caval moto');
+    // Calculate fares using the current distance
+    const currentDistance = result.distance && result.distance > 0 ? result.distance : (passedDistance || 0);
+    const cavalPriveFare = calculateFare(currentDistance, 'Caval Privé');
+    const cavalMotoFare = calculateFare(currentDistance, 'Caval moto');
     
     setCavalPriveFare(cavalPriveFare);
     setCavalMotoFare(cavalMotoFare);
     
     // Center the map on the route when directions are ready
     if (origin && destination) {
-      const centerLat = (origin.latitude + destination.latitude) / 2;
+      // Shift the center point upward by adjusting the latitude
+      const centerLat = ((origin.latitude + destination.latitude) / 2) - 0.05; // Reduced offset to 0.05
       const centerLng = (origin.longitude + destination.longitude) / 2;
+      
+      // Calculate the appropriate zoom level based on distance with more padding
+      const latDelta = Math.abs(origin.latitude - destination.latitude) * 2.5;
+      const lngDelta = Math.abs(origin.longitude - destination.longitude) * 2.5;
       
       mapRef.current?.animateToRegion({
         latitude: centerLat,
         longitude: centerLng,
-        latitudeDelta: 0.05,
-        longitudeDelta: 0.05,
+        latitudeDelta: Math.max(latDelta, 0.03),
+        longitudeDelta: Math.max(lngDelta, 0.03),
       }, 1000);
     }
   };
 
   // Function to recenter the map on the route
   const recenterMap = () => {
-    // Instead of using fitToCoordinates, just set the region directly
     if (origin && destination) {
-      const centerLat = (origin.latitude + destination.latitude) / 2;
+      // Shift the center point upward by adjusting the latitude
+      const centerLat = ((origin.latitude + destination.latitude) / 2) - 0.05; // Reduced offset to 0.05
       const centerLng = (origin.longitude + destination.longitude) / 2;
+      
+      // Calculate the appropriate zoom level based on distance with more padding
+      const latDelta = Math.abs(origin.latitude - destination.latitude) * 2.5;
+      const lngDelta = Math.abs(origin.longitude - destination.longitude) * 2.5;
       
       mapRef.current?.animateToRegion({
         latitude: centerLat,
         longitude: centerLng,
-        latitudeDelta: 0.05, // Reduced from 0.1 to 0.05 for a more zoomed in view
-        longitudeDelta: 0.05, // Reduced from 0.1 to 0.05 for a more zoomed in view
+        latitudeDelta: Math.max(latDelta, 0.03),
+        longitudeDelta: Math.max(lngDelta, 0.03),
       }, 1000);
     }
   };
@@ -320,38 +346,62 @@ const RideOptionsScreen = () => {
       </View>
 
       {/* Map Section */}
-      <MapView 
-        ref={mapRef} 
-        style={styles.map} 
+      <MapView
+        ref={mapRef}
+        style={StyleSheet.absoluteFill}
         initialRegion={initialRegion}
-        region={initialRegion} // Force the region to stay zoomed out
-        mapPadding={{ top: 0, right: 0, bottom: 450, left: 0 }} // Increased from 350 to 450 to move the map up more
+        showsUserLocation
+        showsMyLocationButton={false}
+        showsCompass={false}
+        rotateEnabled={false}
+        mapPadding={{ top: 250, right: 0, bottom: 350, left: 0 }}
       >
+        {/* Origin Marker */}
         {origin && (
-          <Marker coordinate={origin} anchor={{ x: 0.5, y: 1 }}>
-            <View style={styles.markerContainer}>
-              <Image source={CustomPin} style={styles.pin} resizeMode="contain" />
-              <Text style={styles.markerLabel} numberOfLines={1} ellipsizeMode="tail">
-                {origin.address ? origin.address : "Origine"}
-              </Text>
+          <Marker coordinate={origin} title="Point de départ">
+            <View style={{
+              backgroundColor: '#FF6F00',
+              padding: 8,
+              borderRadius: 20,
+              borderWidth: 2,
+              borderColor: '#fff',
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: 2 },
+              shadowOpacity: 0.3,
+              shadowRadius: 4,
+              elevation: 5,
+            }}>
+              <Ionicons name="location" size={20} color="#fff" />
             </View>
           </Marker>
         )}
+
+        {/* Destination Marker */}
         {destination && (
-          <Marker coordinate={destination} anchor={{ x: 0.5, y: 1 }}>
-            <View style={styles.markerContainer}>
-              <Image source={CustomPin} style={styles.pin} resizeMode="contain" />
-              <Text style={styles.markerLabel} numberOfLines={1} ellipsizeMode="tail">
-                {destination.address ? destination.address : "Destination"}
-              </Text>
+          <Marker coordinate={destination} title="Destination">
+            <View style={{
+              backgroundColor: '#4CAF50',
+              padding: 8,
+              borderRadius: 20,
+              borderWidth: 2,
+              borderColor: '#fff',
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: 2 },
+              shadowOpacity: 0.3,
+              shadowRadius: 4,
+              elevation: 5,
+            }}>
+              <Ionicons name="flag" size={20} color="#fff" />
             </View>
           </Marker>
         )}
+
+        {/* Route Directions */}
         {origin && destination && (
           <MapViewDirections
             origin={origin}
             destination={destination}
-            apikey={GOOGLE_MAPS_APIKEY}
+            apikey={GOOGLE_API_KEY}
             strokeWidth={4}
             strokeColor="#FF6F00"
             onReady={handleDirectionsReady}
@@ -387,7 +437,7 @@ const RideOptionsScreen = () => {
           rideType="Caval Privé"
           iconName="car"
           arrivalTime={getFormattedArrivalTime(duration)}
-          distance={distance.toFixed(1)}
+          distance={typeof distance === 'number' && !isNaN(distance) ? distance.toFixed(1) : 'N/A'}
           fare={cavalPriveFare}
           onSelect={() => handleRideSelection("Caval Privé")}
         />
@@ -396,7 +446,7 @@ const RideOptionsScreen = () => {
           rideType="Caval moto"
           iconName="motorbike"
           arrivalTime={getFormattedArrivalTime(duration)}
-          distance={distance.toFixed(1)}
+          distance={typeof distance === 'number' && !isNaN(distance) ? distance.toFixed(1) : 'N/A'}
           fare={cavalMotoFare}
           onSelect={() => handleRideSelection("Caval moto")}
           useMotoImage
@@ -712,14 +762,17 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     marginBottom: 20,
+    paddingRight: 40,
   },
   modalTitle: {
     fontSize: 20,
     fontWeight: "700",
     color: "#fff",
+    marginRight: 20,
   },
   closeButton: {
     padding: 5,
+    marginLeft: 5,
   },
   paymentMethodsList: {
     marginBottom: 20,

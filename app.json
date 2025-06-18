@@ -1,11 +1,12 @@
 {
   "expo": {
-    "name": "Caval",
-    "slug": "caval",
-    "version": "5.0.0",
+    "name": "Eco-share",
+    "slug": "Eco-share",
+    "owner": "zouhair123",
+    "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "userInterfaceStyle": "automatic",
+    "userInterfaceStyle": "light",
     "scheme": "com.googleusercontent.apps.1007561335979-uiduf2a3h59mjcdassp5hl3rgljr5tes",
     "splash": {
       "image": "./assets/splash.png",
@@ -14,73 +15,68 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.caval.courier.ios",
+      "bundleIdentifier": "com.misscoding.Eco-Share",
       "googleServicesFile": "./GoogleService-Info.plist",
-      "buildNumber": "5",
+      "newArchEnabled": true,
+      "buildNumber": "1",
       "infoPlist": {
-        "NSLocationWhenInUseUsageDescription": "Caval needs access to your location to find nearby drivers and show your position on the map.",
-        "NSLocationAlwaysUsageDescription": "Caval needs access to your location to find nearby drivers and show your position on the map.",
-        "UIBackgroundModes": ["location", "fetch"],
+        "NSLocationWhenInUseUsageDescription": "We need your location to show nearby rides and provide accurate navigation.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "We need your location to show nearby rides and provide accurate navigation even when the app is in the background.",
+        "NSLocationAlwaysUsageDescription": "We need your location to show nearby rides and provide accurate navigation even when the app is in the background.",
+        "NSCameraUsageDescription": "We need access to your camera to allow you to take profile pictures and document your rides.",
+        "NSPhotoLibraryUsageDescription": "We need access to your photo library to allow you to select profile pictures and document your rides.",
+        "UIBackgroundModes": [
+          "location",
+          "fetch"
+        ],
         "ITSAppUsesNonExemptEncryption": false
-      },
-      "config": {
-        "usesNonExemptEncryption": false
       }
     },
     "android": {
-      "package": "com.caval.app",
-      "versionCode": 5,
+      "package": "com.misscoding.ecoshare",
+      "versionCode": 103,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
+      "config": {
+        "googleMaps": {
+          "apiKey": "AIzaSyBnVN-ACYzcA0Sy8BcPLpXG50Y9T8jhJGE"
+        }
+      },
       "permissions": [
-        "ACCESS_COARSE_LOCATION",
         "ACCESS_FINE_LOCATION",
-        "FOREGROUND_SERVICE"
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_BACKGROUND_LOCATION"
       ],
       "googleServicesFile": "./google-services.json"
     },
     "web": {
-      "favicon": "./assets/favicon.png",
-      "config": {
-        "firebase": {
-          "apiKey": "AIzaSyAxeOgFmJruEmkvNdNemWzSSKGtteR5Tps",
-          "authDomain": "yeco-share-92ef1.firebaseapp.com",
-          "projectId": "eco-share-92ef1",
-          "storageBucket": "eco-share-92ef1.appspot.com",
-          "messagingSenderId": "747419763478",
-          "appId": "1:747419763478:web:a12bb5f1d9e6fa082c8637"
-        }
-      }
+      "favicon": "./assets/favicon.png"
     },
     "extra": {
       "eas": {
-        "projectId": "88f8c21c-ab55-4cbf-81bb-441a80e603d2"
-      }
+        "projectId": "97f35a2b-2bbf-4893-9f43-cd2df775196a"
+      },
+      "firebaseApiKey": "AIzaSyBMQW59pFle0vVp0xotmnpVTYqAlTbdbQQ",
+      "firebaseAuthDomain": "eco-share-92ef1.firebaseapp.com",
+      "firebaseProjectId": "eco-share-92ef1",
+      "firebaseStorageBucket": "eco-share-92ef1.firebasestorage.app",
+      "firebaseMessagingSenderId": "747419763478",
+      "firebaseAppId": "1:747419763478:android:32f44f9a3306b9c32c8637",
+      "firebaseMeasurementId": "G-XXXXXXXXXX"
     },
     "plugins": [
       "expo-secure-store",
-      [
-        "expo-build-properties",
-        {
-          "ios": {
-            "useFrameworks": "static"
-          }
-        }
-      ],
       "expo-web-browser",
       [
         "expo-location",
         {
-          "locationAlwaysAndWhenInUsePermission": "Allow Caval to use your location."
+          "locationAlwaysAndWhenInUsePermission": "Allow Eco-share to use your location to show nearby rides and provide accurate navigation.",
+          "locationAlwaysPermission": "Allow Eco-share to use your location to show nearby rides and provide accurate navigation even when the app is in the background.",
+          "locationWhenInUsePermission": "Allow Eco-share to use your location to show nearby rides and provide accurate navigation."
         }
       ]
-    ],
-    "owner": "zouhair123",
-    "runtimeVersion":"1.0.0",
-    "updates": {
-      "url": "https://u.expo.dev/88f8c21c-ab55-4cbf-81bb-441a80e603d2"
-    }
+    ]
   }
 }

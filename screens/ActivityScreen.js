@@ -8,6 +8,10 @@ import {
   FlatList,
   ActivityIndicator,
   useColorScheme as _useColorScheme,
+  Alert,
+  Linking,
+  Platform,
+  Dimensions,
 } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import { firestore, auth } from "../firebase.config";
@@ -18,12 +22,16 @@ import {
   orderBy,
   limit,
   onSnapshot,
+  getDocs,
+  doc,
+  getDoc,
 } from "firebase/firestore";
 import { Ionicons } from "@expo/vector-icons";
-import { GOOGLE_MAPS_APIKEY } from "@env";
 import { StatusBar } from "expo-status-bar";
 import ProfilePicture from '../components/ProfilePicture';
 import * as Location from 'expo-location';
+import { getAuth } from "firebase/auth";
+import { MaterialIcons } from '@expo/vector-icons';
 
 // Create Theme Context
 const ThemeContext = React.createContext();
@@ -46,6 +54,9 @@ export const ThemeProvider = ({ children }) => {
 
 export const useTheme = () => useContext(ThemeContext);
 
+// Use the same API key as other screens
+const GOOGLE_API_KEY = 'AIzaSyBnVN-ACYzcA0Sy8BcPLpXG50Y9T8jhJGE';
+
 // Geocoding function
 async function geocodeLatLng(lat, lng) {
   if (
@@ -59,7 +70,7 @@ async function geocodeLatLng(lat, lng) {
   }
   const latitude = Number(lat);
   const longitude = Number(lng);
-  const url = `https://maps.googleapis.com/maps/api/geocode/json?latlng=${latitude},${longitude}&key=${GOOGLE_MAPS_APIKEY}`;
+  const url = `https://maps.googleapis.com/maps/api/geocode/json?latlng=${latitude},${longitude}&key=${GOOGLE_API_KEY}`;
   try {
     const response = await fetch(url);
     const data = await response.json();
@@ -90,7 +101,8 @@ async function geocodeLatLng(lat, lng) {
 
 function ActivityScreen() {
   const navigation = useNavigation();
-  const [rides, setRides] = useState([]);
+  const [currentRides, setCurrentRides] = useState([]);
+  const [completedRides, setCompletedRides] = useState([]);
   const [loading, setLoading] = useState(true);
   const [addressMap, setAddressMap] = useState({});
   const { theme, toggleTheme } = useTheme();
@@ -104,29 +116,53 @@ function ActivityScreen() {
       setLoading(false);
       return;
     }
-    const ridesRef = collection(firestore, "rideRequests");
-    const q = query(
-      ridesRef,
+
+    // Fetch current active rides
+    const currentRidesRef = collection(firestore, "rideRequests");
+    const currentQuery = query(
+      currentRidesRef,
       where("userId", "==", currentUser.uid),
-      where("status", "==", "active"), // Changed from "assigned" to "active"
-      orderBy("createdAt", "desc"),
-      limit(10) // Increased limit to show more rides
+      where("status", "==", "active"),
+      orderBy("createdAt", "desc")
     );
-    const unsubscribe = onSnapshot(q, (snapshot) => {
+
+    // Fetch completed rides
+    const completedQuery = query(
+      currentRidesRef,
+      where("userId", "==", currentUser.uid),
+      where("status", "==", "completed"),
+      orderBy("createdAt", "desc"),
+      limit(10)
+    );
+
+    const unsubscribeCurrent = onSnapshot(currentQuery, (snapshot) => {
       const ridesData = snapshot.docs.map((doc) => ({
         id: doc.id,
         ...doc.data(),
       }));
-      setRides(ridesData);
+      setCurrentRides(ridesData);
+    });
+
+    const unsubscribeCompleted = onSnapshot(completedQuery, (snapshot) => {
+      const ridesData = snapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
+      setCompletedRides(ridesData);
       setLoading(false);
     });
-    return () => unsubscribe();
+
+    return () => {
+      unsubscribeCurrent();
+      unsubscribeCompleted();
+    };
   }, [auth]);
 
   // Fetch and store addresses for each ride
   useEffect(() => {
     (async () => {
-      for (const ride of rides) {
+      const allRides = [...currentRides, ...completedRides];
+      for (const ride of allRides) {
         if (!addressMap[ride.id]) {
           let pickupAddress = "Address not found";
           let destinationAddress = "Address not found";
@@ -146,7 +182,7 @@ function ActivityScreen() {
         }
       }
     })();
-  }, [rides]);
+  }, [currentRides, completedRides]);
 
   // Helper to format the ride date/time
   function formatRideDate(rideDate) {
@@ -165,7 +201,7 @@ function ActivityScreen() {
       : `${rideDate.toLocaleDateString()} à ${timeStr}`;
   }
 
-  const renderRideItem = ({ item }) => {
+  const renderRideItem = ({ item, isCurrentRide = false }) => {
     // Convert Firestore timestamp to JavaScript Date object
     const formattedDate = item.createdAt && item.createdAt.toDate ? 
       formatRideDate(item.createdAt.toDate()) : 
@@ -178,99 +214,285 @@ function ActivityScreen() {
       addressMap[item.id]?.destinationAddress ||
       `${item.destinationLat}, ${item.destinationLng}`;
 
+    const handleRidePress = () => {
+      if (isCurrentRide) {
+        // Navigate to DriverFoundScreen for current rides
+        navigation.navigate("DriverFoundScreen", {
+          rideId: item.id,
+          rideType: item.rideType,
+          distance: typeof item.distance === "number" ? item.distance : 0,
+          duration: typeof item.duration === "number" ? item.duration : 0,
+          pickupLat: item.pickupLat,
+          pickupLng: item.pickupLng,
+          destinationLat: item.destinationLat,
+          destinationLng: item.destinationLng,
+          driverPhoto: item.driverPhoto,
+          driverName: item.driverName,
+          driverId: item.driverId,
+          driverPhone: item.driverPhone,
+          fare: item.fare || 0,
+        });
+      } else {
+        // Show details alert for completed rides
+        Alert.alert(
+          "Détails de la course",
+          `Course du ${formattedDate}\n\nDépart: ${pickupAddr}\nDestination: ${destinationAddr}\nDistance: ${typeof item.distance === "number" ? `${Number(item.distance).toFixed(1)} km` : "N/A"}\nDurée: ${typeof item.duration === "number" ? `${Number(item.duration).toFixed(0)} min` : "N/A"}\nPrix: ${item.fare ? `${item.fare} Fdj` : "N/A"}`,
+          [{ text: "OK" }]
+        );
+      }
+    };
+
+    const getStatusText = () => {
+      if (isCurrentRide) {
+        switch (item.status) {
+          case "active":
+            return "En attente de chauffeur";
+          case "assigned":
+            return "Chauffeur assigné";
+          case "pickup":
+            return "En route vers vous";
+          case "in_progress":
+            return "Trajet en cours";
+          default:
+            return "En cours";
+        }
+      }
+      return "Course terminée";
+    };
+
+    const getStatusColor = () => {
+      if (isCurrentRide) {
+        return colors.accent; // Orange for current rides
+      }
+      return colors.statusActive; // Green for completed rides
+    };
+
     return (
       <TouchableOpacity
-        style={[styles.card, { backgroundColor: colors.cardBackground }]}
+        style={[
+          styles.card, 
+          { 
+            backgroundColor: colors.cardBackground,
+            borderWidth: isCurrentRide ? 2 : 0,
+            borderColor: isCurrentRide ? colors.accent : 'transparent',
+            shadowOpacity: isCurrentRide ? 0.15 : 0.08,
+            shadowRadius: isCurrentRide ? 12 : 8,
+            elevation: isCurrentRide ? 6 : 3,
+          }
+        ]}
         activeOpacity={0.7}
-        onPress={() =>
-          navigation.navigate("DriverFoundScreen", {
-            rideId: item.id,
-            rideType: item.rideType,
-            distance: typeof item.distance === "number" ? item.distance : 0,
-            duration: typeof item.duration === "number" ? item.duration : 0,
-            pickupLat: item.pickupLat,
-            pickupLng: item.pickupLng,
-            destinationLat: item.destinationLat,
-            destinationLng: item.destinationLng,
-            driverPhoto: item.driverPhoto,
-            driverName: item.driverName,
-            driverId: item.driverId,
-            driverPhone: item.driverPhone,
-            fare: item.fare || 0,
-          })
-        }
+        onPress={handleRidePress}
       >
-        <View style={[styles.cardHeader, { backgroundColor: colors.accentLight }]}>
-          <Text style={[styles.headerLeft, { color: colors.textPrimary }]}>
-            {formattedDate}
+        <View style={[
+          styles.cardHeader, 
+          { 
+            backgroundColor: isCurrentRide ? colors.accent : colors.accentLight,
+            paddingVertical: isCurrentRide ? 16 : 12,
+          }
+        ]}>
+          <Text style={[
+            styles.headerLeft, 
+            { 
+              color: isCurrentRide ? '#FFFFFF' : colors.textPrimary,
+              fontSize: isCurrentRide ? 16 : 15,
+              fontWeight: isCurrentRide ? "700" : "600",
+            }
+          ]}>
+            {isCurrentRide ? (item.rideType || "Caval Taxi") : formattedDate}
           </Text>
-          <View style={styles.rideTypeContainer}>
-            <Text style={[styles.headerRight, { color: colors.accent }]}>
-              {item.rideType || "Caval Taxi"}
+          <View style={[
+            styles.rideTypeContainer,
+            { backgroundColor: isCurrentRide ? 'rgba(255,255,255,0.2)' : 'transparent' }
+          ]}>
+            <Text style={[
+              styles.headerRight, 
+              { 
+                color: isCurrentRide ? '#FFFFFF' : colors.accent,
+                fontSize: isCurrentRide ? 15 : 14,
+                fontWeight: isCurrentRide ? "700" : "700",
+              }
+            ]}>
+              {isCurrentRide ? "" : (item.rideType || "Caval Taxi")}
             </Text>
           </View>
+          {isCurrentRide && (
+            <View style={styles.currentRideBadge}>
+              <Ionicons name="flash" size={16} color="#FFFFFF" />
+              <Text style={styles.currentRideBadgeText}>ACTIVE</Text>
+            </View>
+          )}
         </View>
         
-        <View style={styles.driverInfoPreview}>
+        <View style={[
+          styles.driverInfoPreview,
+          { paddingHorizontal: isCurrentRide ? 20 : 16 }
+        ]}>
           <ProfilePicture 
             photoUrl={item.driverPhoto}
-            size={50}
+            size={isCurrentRide ? 60 : 50}
             style={styles.previewDriverPhoto}
           />
           <View style={styles.driverTextInfo}>
-            <Text style={[styles.previewDriverName, { color: colors.textPrimary }]}>
+            <Text style={[
+              styles.previewDriverName, 
+              { 
+                color: colors.textPrimary,
+                fontSize: isCurrentRide ? 20 : 18,
+                fontWeight: isCurrentRide ? "700" : "700",
+              }
+            ]}>
               {item.driverName || "Driver Name"}
             </Text>
-            <Text style={[styles.previewRideType, { color: colors.accent }]}>
+            <Text style={[
+              styles.previewRideType, 
+              { 
+                color: colors.accent,
+                fontSize: isCurrentRide ? 16 : 15,
+              }
+            ]}>
               {item.rideType || "Caval Taxi"}
             </Text>
           </View>
         </View>
-        <View style={styles.rideStatus}>
-          <View style={[styles.statusIndicator, { backgroundColor: colors.statusActive }]} />
-          <Text style={[styles.rideStatusText, { color: colors.textPrimary }]}>
-            {item.status === "completed" ? "Course terminée" : "Trajet en cours"}
+        
+        <View style={[
+          styles.rideStatus,
+          { paddingHorizontal: isCurrentRide ? 20 : 16 }
+        ]}>
+          <View style={[
+            styles.statusIndicator, 
+            { 
+              backgroundColor: getStatusColor(),
+              width: isCurrentRide ? 10 : 8,
+              height: isCurrentRide ? 10 : 8,
+              borderRadius: isCurrentRide ? 5 : 4,
+            }
+          ]} />
+          <Text style={[
+            styles.rideStatusText, 
+            { 
+              color: colors.textPrimary,
+              fontSize: isCurrentRide ? 16 : 14,
+              fontWeight: isCurrentRide ? "700" : "600",
+            }
+          ]}>
+            {getStatusText()}
           </Text>
         </View>
         
-        <View style={styles.infoContainer}>
+        <View style={[
+          styles.infoContainer,
+          { paddingHorizontal: isCurrentRide ? 20 : 16 }
+        ]}>
           <View style={styles.addressRow}>
-            <View style={[styles.bullet, { backgroundColor: colors.pickupColor }]} />
+            <View style={[
+              styles.bullet, 
+              { 
+                backgroundColor: colors.pickupColor,
+                width: isCurrentRide ? 12 : 10,
+                height: isCurrentRide ? 12 : 10,
+                borderRadius: isCurrentRide ? 6 : 5,
+              }
+            ]} />
             <View style={styles.addressContainer}>
-              <Text style={[styles.addressLabel, { color: colors.textSecondary }]}>Départ</Text>
-              <Text style={[styles.addressText, { color: colors.textPrimary }]} numberOfLines={1}>
+              <Text style={[
+                styles.addressLabel, 
+                { 
+                  color: colors.textSecondary,
+                  fontSize: isCurrentRide ? 13 : 12,
+                }
+              ]}>Départ</Text>
+              <Text style={[
+                styles.addressText, 
+                { 
+                  color: colors.textPrimary,
+                  fontSize: isCurrentRide ? 16 : 15,
+                }
+              ]} numberOfLines={1}>
                 {pickupAddr}
               </Text>
             </View>
           </View>
           
-          <View style={[styles.verticalLine, { backgroundColor: colors.divider }]} />
+          <View style={[
+            styles.verticalLine, 
+            { 
+              backgroundColor: colors.divider,
+              height: isCurrentRide ? 16 : 14,
+            }
+          ]} />
           
           <View style={styles.addressRow}>
-            <View style={[styles.bullet, { backgroundColor: colors.destinationColor }]} />
+            <View style={[
+              styles.bullet, 
+              { 
+                backgroundColor: colors.destinationColor,
+                width: isCurrentRide ? 12 : 10,
+                height: isCurrentRide ? 12 : 10,
+                borderRadius: isCurrentRide ? 6 : 5,
+              }
+            ]} />
             <View style={styles.addressContainer}>
-              <Text style={[styles.addressLabel, { color: colors.textSecondary }]}>Destination</Text>
-              <Text style={[styles.addressText, { color: colors.textPrimary }]} numberOfLines={1}>
+              <Text style={[
+                styles.addressLabel, 
+                { 
+                  color: colors.textSecondary,
+                  fontSize: isCurrentRide ? 13 : 12,
+                }
+              ]}>Destination</Text>
+              <Text style={[
+                styles.addressText, 
+                { 
+                  color: colors.textPrimary,
+                  fontSize: isCurrentRide ? 16 : 15,
+                }
+              ]} numberOfLines={1}>
                 {destinationAddr}
               </Text>
             </View>
           </View>
           
-          <View style={[styles.divider, { backgroundColor: colors.divider }]} />
+          <View style={[
+            styles.divider, 
+            { 
+              backgroundColor: colors.divider,
+              marginVertical: isCurrentRide ? 16 : 12,
+            }
+          ]} />
           
           <View style={styles.bottomRow}>
             <View style={styles.rideMetrics}>
               <View style={styles.metricItem}>
-                <Ionicons name="speedometer-outline" size={16} color={colors.textSecondary} />
-                <Text style={[styles.metricText, { color: colors.textPrimary }]}>
+                <Ionicons 
+                  name="speedometer-outline" 
+                  size={isCurrentRide ? 18 : 16} 
+                  color={colors.textSecondary} 
+                />
+                <Text style={[
+                  styles.metricText, 
+                  { 
+                    color: colors.textPrimary,
+                    fontSize: isCurrentRide ? 15 : 14,
+                  }
+                ]}>
                   {typeof item.distance === "number"
                     ? `${Number(item.distance).toFixed(1)} km`
                     : "N/A"}
                 </Text>
               </View>
               <View style={styles.metricItem}>
-                <Ionicons name="time-outline" size={16} color={colors.textSecondary} />
-                <Text style={[styles.metricText, { color: colors.textPrimary }]}>
+                <Ionicons 
+                  name="time-outline" 
+                  size={isCurrentRide ? 18 : 16} 
+                  color={colors.textSecondary} 
+                />
+                <Text style={[
+                  styles.metricText, 
+                  { 
+                    color: colors.textPrimary,
+                    fontSize: isCurrentRide ? 15 : 14,
+                  }
+                ]}>
                   {typeof item.duration === "number"
                     ? `${Number(item.duration).toFixed(0)} min`
                     : "N/A"}
@@ -278,8 +500,21 @@ function ActivityScreen() {
               </View>
             </View>
             <View style={styles.fareContainer}>
-              <Text style={[styles.fareLabel, { color: colors.textSecondary }]}>Prix</Text>
-              <Text style={[styles.fareText, { color: colors.accent }]}>
+              <Text style={[
+                styles.fareLabel, 
+                { 
+                  color: colors.textSecondary,
+                  fontSize: isCurrentRide ? 13 : 12,
+                }
+              ]}>Prix</Text>
+              <Text style={[
+                styles.fareText, 
+                { 
+                  color: colors.accent,
+                  fontSize: isCurrentRide ? 20 : 18,
+                  fontWeight: isCurrentRide ? "700" : "700",
+                }
+              ]}>
                 {item.fare ? `${item.fare} Fdj` : "N/A"}
               </Text>
             </View>
@@ -302,6 +537,10 @@ function ActivityScreen() {
           <Ionicons name="arrow-back" size={22} color={colors.textPrimary} />
         </TouchableOpacity>
         
+        <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>
+          Historique des courses
+        </Text>
+        
         <TouchableOpacity 
           style={[styles.headerButton, { backgroundColor: colors.buttonBackground }]} 
           onPress={toggleTheme}
@@ -318,24 +557,73 @@ function ActivityScreen() {
         <View style={styles.loaderContainer}>
           <ActivityIndicator size="large" color={colors.accent} />
         </View>
-      ) : rides.length === 0 ? (
-        <View style={styles.noRidesContainer}>
-          <Ionicons name="car-outline" size={60} color={colors.textSecondary} />
-          <Text style={[styles.noRidesText, { color: colors.textSecondary }]}>
-            Aucune activité trouvée.
-          </Text>
-          <TouchableOpacity 
-            style={[styles.newRideButton, { backgroundColor: colors.accent }]}
-            onPress={() => navigation.navigate("HomeTabs")}
-          >
-            <Text style={styles.newRideButtonText}>Demander un taxi</Text>
-          </TouchableOpacity>
-        </View>
       ) : (
         <FlatList
-          data={rides}
-          keyExtractor={(item) => item.id}
-          renderItem={renderRideItem}
+          data={[
+            { type: 'current', data: currentRides },
+            { type: 'past', data: completedRides }
+          ]}
+          keyExtractor={(item, index) => `${item.type}-${index}`}
+          renderItem={({ item }) => {
+            if (item.type === 'current') {
+              return (
+                <View style={styles.sectionContainer}>
+                  <Text style={[styles.sectionHeader, { color: colors.textPrimary }]}>
+                    Course actuelle
+                  </Text>
+                  {item.data.length > 0 ? (
+                    item.data.map((ride) => (
+                      <View key={ride.id}>
+                        {renderRideItem({ item: ride, isCurrentRide: true })}
+                      </View>
+                    ))
+                  ) : (
+                    <View style={[styles.emptyStateContainer, { backgroundColor: colors.cardBackground }]}>
+                      <Ionicons name="car-outline" size={40} color={colors.textSecondary} />
+                      <Text style={[styles.emptyStateTitle, { color: colors.textPrimary }]}>
+                        Aucune course en cours
+                      </Text>
+                      <Text style={[styles.emptyStateSubtext, { color: colors.textSecondary }]}>
+                        Vous n'avez pas de course active en ce moment
+                      </Text>
+                      <TouchableOpacity 
+                        style={[styles.newRideButton, { backgroundColor: colors.accent }]}
+                        onPress={() => navigation.navigate("HomeTabs")}
+                      >
+                        <Text style={styles.newRideButtonText}>Demander un taxi</Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
+                </View>
+              );
+            } else if (item.type === 'past') {
+              return (
+                <View style={styles.sectionContainer}>
+                  <Text style={[styles.sectionHeader, { color: colors.textPrimary }]}>
+                    Courses passées
+                  </Text>
+                  {item.data.length > 0 ? (
+                    item.data.map((ride) => (
+                      <View key={ride.id}>
+                        {renderRideItem({ item: ride, isCurrentRide: false })}
+                      </View>
+                    ))
+                  ) : (
+                    <View style={[styles.emptyStateContainer, { backgroundColor: colors.cardBackground }]}>
+                      <Ionicons name="time-outline" size={40} color={colors.textSecondary} />
+                      <Text style={[styles.emptyStateTitle, { color: colors.textPrimary }]}>
+                        Aucun historique
+                      </Text>
+                      <Text style={[styles.emptyStateSubtext, { color: colors.textSecondary }]}>
+                        Vos courses terminées apparaîtront ici
+                      </Text>
+                    </View>
+                  )}
+                </View>
+              );
+            }
+            return null;
+          }}
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
         />
@@ -404,6 +692,16 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 2,
   },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+  },
+  sectionHeader: {
+    fontSize: 18,
+    fontWeight: "700",
+    marginBottom: 16,
+    marginTop: 8,
+  },
   /***** LOADER / NO RIDES *****/
   loaderContainer: {
     flex: 1,
@@ -420,6 +718,11 @@ const styles = StyleSheet.create({
     fontSize: 18,
     marginTop: 16,
     marginBottom: 24,
+    textAlign: "center",
+  },
+  noRidesSubtext: {
+    fontSize: 14,
+    marginTop: 8,
     textAlign: "center",
   },
   newRideButton: {
@@ -575,6 +878,50 @@ const styles = StyleSheet.create({
   fareText: {
     fontSize: 18,
     fontWeight: "700",
+  },
+  currentRideBadge: {
+    backgroundColor: '#FF8F00',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginLeft: 8,
+  },
+  currentRideBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontWeight: '700',
+    marginLeft: 4,
+  },
+  sectionContainer: {
+    marginBottom: 24,
+  },
+  emptyStateContainer: {
+    borderRadius: 16,
+    padding: 32,
+    alignItems: "center",
+    justifyContent: "center",
+    marginHorizontal: 16,
+    marginTop: 8,
+    shadowColor: "#000",
+    shadowOpacity: 0.05,
+    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  emptyStateTitle: {
+    fontSize: 16,
+    fontWeight: "600",
+    marginTop: 12,
+    marginBottom: 8,
+    textAlign: "center",
+  },
+  emptyStateSubtext: {
+    fontSize: 14,
+    textAlign: "center",
+    marginBottom: 20,
+    lineHeight: 20,
   },
 });
 

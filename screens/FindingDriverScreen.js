@@ -16,13 +16,17 @@ import {
 import MapView, { Marker } from "react-native-maps";
 import MapViewDirections from "react-native-maps-directions";
 import { useRoute, useNavigation } from "@react-navigation/native";
-import { GOOGLE_MAPS_APIKEY } from "@env";
+import { Ionicons } from "@expo/vector-icons";
+import { doc, onSnapshot, updateDoc, collection, addDoc, serverTimestamp } from "firebase/firestore";
 import { firestore } from "../firebase.config";
-import { doc, onSnapshot, updateDoc } from "firebase/firestore";
-import { MaterialIcons, Ionicons } from '@expo/vector-icons';
+import { getAuth } from "firebase/auth";
+import { MaterialIcons } from '@expo/vector-icons';
 import * as Location from "expo-location";
 
 const { width, height } = Dimensions.get("window");
+
+// Use the same API key as other screens
+const GOOGLE_API_KEY = 'AIzaSyBnVN-ACYzcA0Sy8BcPLpXG50Y9T8jhJGE';
 
 const FindingDriverScreen = () => {
   const route = useRoute();
@@ -200,7 +204,7 @@ const FindingDriverScreen = () => {
   // Fonction de géocodage inversé
   const reverseGeocodeLocation = async (latitude, longitude) => {
     try {
-      const url = `https://maps.googleapis.com/maps/api/geocode/json?latlng=${latitude},${longitude}&key=${GOOGLE_MAPS_APIKEY}`;
+      const url = `https://maps.googleapis.com/maps/api/geocode/json?latlng=${latitude},${longitude}&key=${GOOGLE_API_KEY}`;
       const response = await fetch(url);
       const data = await response.json();
       
@@ -517,7 +521,7 @@ const FindingDriverScreen = () => {
             <MapViewDirections
               origin={origin}
               destination={destination}
-              apikey={GOOGLE_MAPS_APIKEY}
+              apikey={GOOGLE_API_KEY}
               strokeWidth={4}
               strokeColor="#FF6F00"
               onReady={handleDirectionsReady}

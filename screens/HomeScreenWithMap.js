@@ -16,12 +16,12 @@ import {
   Dimensions,
   Alert,
   Linking,
+  Animated,
 } from "react-native";
 import * as Location from "expo-location";
 import { GooglePlacesAutocomplete } from "react-native-google-places-autocomplete";
 import MapView, { Marker, PROVIDER_DEFAULT } from "react-native-maps";
 import { Ionicons } from "@expo/vector-icons";
-import { GOOGLE_MAPS_APIKEY } from "@env";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { LinearGradient } from "expo-linear-gradient";
 import { doc, getDoc, collection, addDoc } from "firebase/firestore";
@@ -34,6 +34,9 @@ const RECENT_SEARCHES_KEY = "recentSearches";
 const THEME_STORAGE_KEY = "appTheme";
 const { width, height } = Dimensions.get("window");
 
+// Use the new API key directly
+const GOOGLE_API_KEY = 'AIzaSyBnVN-ACYzcA0Sy8BcPLpXG50Y9T8jhJGE';
+
 const HomeScreenWithMap = ({ userName = "User" }) => {
   const navigation = useNavigation();
   const route = useRoute();
@@ -42,8 +45,8 @@ const HomeScreenWithMap = ({ userName = "User" }) => {
 
   // Theme state – retained for other UI elements, but the map will use dark theme always.
   const [isDarkMode, setIsDarkMode] = useState(false);
-  const [keyboardHeight, setKeyboardHeight] = useState(0); // New state for keyboard height
-  const [keyboardVisible, setKeyboardVisible] = useState(false); // Track keyboard visibility
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+  const [keyboardVisible, setKeyboardVisible] = useState(false);
 
   // Set up keyboard listeners to update keyboardHeight
   useEffect(() => {
@@ -239,8 +242,10 @@ const HomeScreenWithMap = ({ userName = "User" }) => {
             setFromLocation({ latitude, longitude });
             setPickupText("Position actuelle");
           }
-          setRegion({ latitude, longitude, ...defaultZoomDelta });
-          mapRef.current?.animateToRegion({ latitude, longitude, ...defaultZoomDelta }, 1000);
+          // Shift the view down by adjusting the latitude
+          const adjustedLatitude = latitude - 0.005; // Reduced shift to 0.005 degrees
+          setRegion({ latitude: adjustedLatitude, longitude, ...defaultZoomDelta });
+          mapRef.current?.animateToRegion({ latitude: adjustedLatitude, longitude, ...defaultZoomDelta }, 1000);
         }
       } catch (err) {
         setLoading(false);
@@ -341,11 +346,19 @@ const HomeScreenWithMap = ({ userName = "User" }) => {
     if (!searchText.trim()) return;
     try {
       setLoading(true);
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+
       const response = await fetch(
         `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(
           searchText
-        )}&key=${GOOGLE_MAPS_APIKEY}`
+        )}&key=${GOOGLE_API_KEY}`,
+        {
+          signal: controller.signal,
+          timeout: 10000 // 10 second timeout
+        }
       );
+      clearTimeout(timeoutId);
       const data = await response.json();
       if (data.status === "OK" && data.results && data.results.length > 0) {
         const location = data.results[0].geometry.location;
@@ -369,8 +382,13 @@ const HomeScreenWithMap = ({ userName = "User" }) => {
       }
     } catch (error) {
       setLoading(false);
-      console.error("Erreur lors de la récupération de la géolocalisation :", error);
-      alert("Erreur lors de la récupération de la localisation. Veuillez réessayer.");
+      if (error.name === 'AbortError') {
+        console.error("Request timed out");
+        alert("La requête a expiré. Veuillez réessayer.");
+      } else {
+        console.error("Erreur lors de la récupération de la géolocalisation :", error);
+        alert("Erreur lors de la récupération de la localisation. Veuillez réessayer.");
+      }
     }
   };
 
@@ -383,8 +401,10 @@ const HomeScreenWithMap = ({ userName = "User" }) => {
 
   const centerOnCurrentLocation = () => {
     if (fromLocation) {
+      // Shift the view down by adjusting the latitude
+      const adjustedLatitude = fromLocation.latitude - 0.005; // Reduced shift to 0.005 degrees
       mapRef.current?.animateToRegion(
-        { latitude: fromLocation.latitude, longitude: fromLocation.longitude, ...defaultZoomDelta },
+        { latitude: adjustedLatitude, longitude: fromLocation.longitude, ...defaultZoomDelta },
         500
       );
     }
@@ -397,7 +417,134 @@ const HomeScreenWithMap = ({ userName = "User" }) => {
   const [selectionMode, setSelectionMode] = useState(null); // 'pickup' or 'dropoff' or null
   const [selectedLocation, setSelectedLocation] = useState(null);
 
-  // Add new function to handle map taps
+  // Add animation values
+  const fadeAnim = useRef(new Animated.Value(1)).current;
+  const slideAnim = useRef(new Animated.Value(0)).current;
+  const mapScaleAnim = useRef(new Animated.Value(1)).current;
+
+  // Add animation function
+  const animateTransition = (toSelectionMode) => {
+    if (toSelectionMode) {
+      // Animate to full screen
+      Animated.parallel([
+        Animated.timing(fadeAnim, {
+          toValue: 0,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+        Animated.timing(slideAnim, {
+          toValue: 1,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+        Animated.timing(mapScaleAnim, {
+          toValue: 1.1,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    } else {
+      // Animate back to normal view
+      Animated.parallel([
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+        Animated.timing(slideAnim, {
+          toValue: 0,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+        Animated.timing(mapScaleAnim, {
+          toValue: 1,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }
+  };
+
+  // Modify startLocationSelection to include animation
+  const startLocationSelection = (mode) => {
+    animateTransition(true);
+    setSelectionMode(mode);
+    setSelectedLocation(null);
+  };
+
+  // Modify the selection mode cancel to include animation
+  const handleCancelSelection = () => {
+    animateTransition(false);
+    setTimeout(() => {
+      setSelectionMode(null);
+    }, 300);
+  };
+
+  // Add debounce function at the top with other imports
+  const debounce = (func, wait) => {
+    let timeout;
+    return function executedFunction(...args) {
+      const later = () => {
+        clearTimeout(timeout);
+        func(...args);
+      };
+      clearTimeout(timeout);
+      timeout = setTimeout(later, wait);
+    };
+  };
+
+  // Add new state for tracking the center point
+  const [mapCenter, setMapCenter] = useState(null);
+
+  // Update the handleRegionChange function
+  const handleRegionChange = debounce(async (newRegion) => {
+    if (selectionMode) {
+      // Only update the center point, not the entire region
+      setMapCenter({
+        latitude: newRegion.latitude,
+        longitude: newRegion.longitude
+      });
+    }
+  }, 100);
+
+  // Add new function to handle region change complete
+  const handleRegionChangeComplete = async (newRegion) => {
+    if (selectionMode) {
+      setRegion(newRegion);
+      setSelectedLocation({
+        latitude: newRegion.latitude,
+        longitude: newRegion.longitude
+      });
+
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000);
+
+        const response = await fetch(
+          `https://maps.googleapis.com/maps/api/geocode/json?latlng=${newRegion.latitude},${newRegion.longitude}&key=${GOOGLE_API_KEY}`,
+          {
+            signal: controller.signal,
+            timeout: 10000
+          }
+        );
+        clearTimeout(timeoutId);
+        const data = await response.json();
+        
+        if (data.status === "OK" && data.results && data.results.length > 0) {
+          const address = data.results[0].formatted_address;
+          setSearchText(address);
+        }
+      } catch (error) {
+        if (error.name === 'AbortError') {
+          console.error("Request timed out");
+        } else {
+          console.error("Error reverse geocoding:", error);
+        }
+      }
+    }
+  };
+
+  // Update handleMapPress function
   const handleMapPress = async (event) => {
     if (!selectionMode) return;
 
@@ -405,13 +552,22 @@ const HomeScreenWithMap = ({ userName = "User" }) => {
     setSelectedLocation(coordinate);
 
     try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
+
       const response = await fetch(
-        `https://maps.googleapis.com/maps/api/geocode/json?latlng=${coordinate.latitude},${coordinate.longitude}&key=${GOOGLE_MAPS_APIKEY}`
+        `https://maps.googleapis.com/maps/api/geocode/json?latlng=${coordinate.latitude},${coordinate.longitude}&key=${GOOGLE_API_KEY}`,
+        {
+          signal: controller.signal,
+          timeout: 10000
+        }
       );
+      clearTimeout(timeoutId);
       const data = await response.json();
       
       if (data.status === "OK" && data.results && data.results.length > 0) {
         const address = data.results[0].formatted_address;
+        setSearchText(address);
         
         if (selectionMode === 'pickup') {
           setFromLocation(coordinate);
@@ -419,7 +575,6 @@ const HomeScreenWithMap = ({ userName = "User" }) => {
           setPickupInputVisible(true);
           setShowPickupInput(false);
         } else if (selectionMode === 'dropoff') {
-          setSearchText(address);
           const destinationCoords = {
             latitude: coordinate.latitude,
             longitude: coordinate.longitude,
@@ -446,13 +601,14 @@ const HomeScreenWithMap = ({ userName = "User" }) => {
           // Save to Firestore
           await addDoc(collection(firestore, "rideRequests"), rideRequestData);
           
-          // Navigate to RideOptionsScreen
+          // Navigate to RideOptionsScreen with proper coordinates
           navigation.navigate("RideOptionsScreen", {
             origin: originData,
             destination: destinationCoords,
             customerFirstName,
             customerPhoto,
             customerPhone,
+            distance: calculateDistance(originData, destinationCoords),
           });
         }
         
@@ -460,14 +616,31 @@ const HomeScreenWithMap = ({ userName = "User" }) => {
         mapRef.current?.animateToRegion({ ...coordinate, ...zoomedInDelta }, 500);
       }
     } catch (error) {
-      console.error("Error reverse geocoding:", error);
+      if (error.name === 'AbortError') {
+        console.error("Request timed out");
+        Alert.alert("Erreur", "La requête a expiré. Veuillez réessayer.");
+      } else {
+        console.error("Error reverse geocoding:", error);
+        Alert.alert("Erreur", "Impossible de trouver l'adresse à cet emplacement.");
+      }
     }
   };
 
-  // Add new function to start location selection
-  const startLocationSelection = (mode) => {
-    setSelectionMode(mode);
-    setSelectedLocation(null);
+  // Add distance calculation function
+  const calculateDistance = (origin, destination) => {
+    const R = 6371; // Earth's radius in kilometers
+    const lat1 = origin.latitude * Math.PI / 180;
+    const lat2 = destination.latitude * Math.PI / 180;
+    const deltaLat = (destination.latitude - origin.latitude) * Math.PI / 180;
+    const deltaLon = (destination.longitude - origin.longitude) * Math.PI / 180;
+
+    const a = Math.sin(deltaLat/2) * Math.sin(deltaLat/2) +
+              Math.cos(lat1) * Math.cos(lat2) *
+              Math.sin(deltaLon/2) * Math.sin(deltaLon/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    const distance = R * c;
+
+    return distance.toFixed(1); // Return distance in kilometers with 1 decimal place
   };
 
   // Generate styles (keyboardHeight is used to compute autocomplete list maxHeight)
@@ -532,10 +705,6 @@ const HomeScreenWithMap = ({ userName = "User" }) => {
       activeRideBannerGradient: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", padding: 16 },
       activeRideBannerText: { flex: 1, color: "#fff", fontSize: 16, fontWeight: "600", textAlign: "center" },
       bottomContainer: {
-        position: "absolute",
-        bottom: 0,
-        left: 0,
-        right: 0,
         padding: Platform.OS === "ios" ? 20 : 16,
         paddingTop: 10,
         paddingBottom: Platform.OS === "ios" ? 100 : 16,
@@ -547,10 +716,12 @@ const HomeScreenWithMap = ({ userName = "User" }) => {
         shadowOffset: { width: 0, height: -4 },
         shadowRadius: 12,
         elevation: 8,
-        maxHeight: "50%",
+        maxHeight: Platform.OS === 'android' ? '60%' : '50%',
         zIndex: 5,
-        marginBottom: Platform.OS === 'android' ? 0 : 0,
-        top: Platform.OS === 'android' ? height * 0.58 : undefined,
+        position: 'absolute',
+        bottom: keyboardVisible ? keyboardHeight - 50 : Platform.OS === 'android' ? 20 : 0,
+        left: 0,
+        right: 0,
       },
       bottomContainerHeader: { alignItems: "center", marginBottom: 12 },
       dragHandle: {
@@ -580,7 +751,7 @@ const HomeScreenWithMap = ({ userName = "User" }) => {
       },
       // Autocomplete list view with fixed positioning to ensure it's always visible
       autocompleteListView: {
-        backgroundColor: "#fff",
+        backgroundColor: isDarkMode ? "#2D2D2D" : "#fff",
         borderRadius: 10,
         borderWidth: 1,
         borderColor: "#FF6F00",
@@ -589,14 +760,13 @@ const HomeScreenWithMap = ({ userName = "User" }) => {
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.2,
         shadowRadius: 8,
-        marginHorizontal: 16,
         marginTop: 4,
+        maxHeight: Platform.OS === 'android' ? 200 : 250,
+        zIndex: 9999,
         position: 'absolute',
-        top: 52,
+        top: Platform.OS === 'android' ? 45 : 52,
         left: 0,
         right: 0,
-        maxHeight: Math.min(300, height - 200 - (keyboardVisible ? keyboardHeight : 80)), 
-        zIndex: 9999,
       },
       // Custom row rendering: two lines with black font.
       customAutocompleteRow: {
@@ -650,14 +820,21 @@ const HomeScreenWithMap = ({ userName = "User" }) => {
       destinationRowContainer: {
         flexDirection: "row",
         alignItems: "center",
-        marginBottom: 16,
+        marginBottom: Platform.OS === 'android' ? 8 : 16,
         position: "relative",
         zIndex: 999,
+        paddingTop: Platform.OS === 'android' ? 5 : 0,
       },
       destinationIconContainer: { position: "absolute", left: 14, top: 14, zIndex: 1001 },
-      destinationSearchContainer: { flex: 1, backgroundColor: "transparent", zIndex: 1000 },
+      destinationSearchContainer: { 
+        flex: 1, 
+        backgroundColor: "transparent", 
+        zIndex: 1000,
+        position: 'relative',
+        marginBottom: Platform.OS === 'android' ? 10 : 0,
+      },
       destinationSearchInput: {
-        height: 50,
+        height: Platform.OS === 'android' ? 45 : 50,
         borderRadius: 10,
         backgroundColor: isDarkMode ? "#2D2D2D" : "#F3F4F6",
         paddingLeft: 42,
@@ -666,6 +843,7 @@ const HomeScreenWithMap = ({ userName = "User" }) => {
         color: isDarkMode ? "#fff" : "#333",
         borderWidth: 1,
         borderColor: isDarkMode ? "#444" : "#ddd",
+        zIndex: 1000,
       },
       goButton: {
         marginLeft: 12,
@@ -685,7 +863,7 @@ const HomeScreenWithMap = ({ userName = "User" }) => {
         padding: Platform.OS === "ios" ? 16 : 16,
         borderRadius: 16,
         marginBottom: Platform.OS === "ios" ? 16 : 16,
-        marginTop: Platform.OS === "ios" ? 20 : 12,
+        marginTop: Platform.OS === "ios" ? 20 : 0,
       },
       recentSearchesTitle: { 
         fontSize: 16, 
@@ -747,6 +925,123 @@ const HomeScreenWithMap = ({ userName = "User" }) => {
         fontSize: 14,
         fontWeight: '600',
       },
+      dropPinInstruction: {
+        position: 'absolute',
+        bottom: 40,
+        left: 16,
+        right: 16,
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 10,
+      },
+      dropPinInstructionContent: {
+        backgroundColor: isDarkMode ? 'rgba(30, 30, 30, 0.9)' : 'rgba(255, 255, 255, 0.9)',
+        paddingVertical: 12,
+        paddingHorizontal: 20,
+        borderRadius: 25,
+        flexDirection: 'row',
+        alignItems: 'center',
+        shadowColor: '#000',
+        shadowOpacity: 0.2,
+        shadowOffset: { width: 0, height: 2 },
+        shadowRadius: 4,
+        elevation: 5,
+      },
+      dropPinInstructionText: {
+        marginLeft: 8,
+        fontSize: 16,
+        fontWeight: '600',
+        color: isDarkMode ? '#fff' : '#1F2937',
+      },
+      selectionBottomSheet: {
+        position: 'absolute',
+        left: 0,
+        right: 0,
+        bottom: -20,
+        backgroundColor: isDarkMode ? '#1E1E1E' : '#fff',
+        borderTopLeftRadius: 24,
+        borderTopRightRadius: 24,
+        padding: 24,
+        shadowColor: '#000',
+        shadowOpacity: 0.15,
+        shadowOffset: { width: 0, height: -4 },
+        shadowRadius: 12,
+        elevation: 8,
+        zIndex: 30,
+        alignItems: 'center',
+        marginBottom: Platform.OS === 'ios' ? 40 : 20,
+        paddingBottom: Platform.OS === 'ios' ? 100 : 60,
+        transform: [{ translateY: Platform.OS === 'ios' ? 0 : 0 }],
+      },
+      selectionTitle: {
+        fontSize: 22,
+        fontWeight: '700',
+        color: isDarkMode ? '#fff' : '#111',
+        marginBottom: 4,
+      },
+      selectionSubtitle: {
+        fontSize: 15,
+        color: isDarkMode ? '#B0B0B0' : '#666',
+        marginBottom: 18,
+      },
+      selectionSearchBar: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: isDarkMode ? '#2D2D2D' : '#F3F4F6',
+        borderRadius: 10,
+        paddingVertical: 10,
+        paddingHorizontal: 8,
+        marginBottom: 18,
+        width: '100%',
+        borderWidth: 1,
+        borderColor: isDarkMode ? '#444' : '#ddd',
+      },
+      selectionSearchText: {
+        flex: 1,
+        fontSize: 16,
+        color: isDarkMode ? '#fff' : '#222',
+        marginLeft: 8,
+      },
+      selectionConfirmButton: {
+        backgroundColor: '#FF6F00',
+        borderRadius: 12,
+        paddingVertical: 16,
+        alignItems: 'center',
+        width: '100%',
+        marginBottom: 10,
+        shadowColor: '#FF6F00',
+        shadowOpacity: 0.3,
+        shadowOffset: { width: 0, height: 2 },
+        shadowRadius: 4,
+        elevation: 3,
+      },
+      selectionConfirmButtonText: {
+        color: '#fff',
+        fontSize: 18,
+        fontWeight: '700',
+      },
+      selectionCancelButton: {
+        alignItems: 'center',
+        paddingVertical: 8,
+        width: '100%',
+      },
+      backButton: {
+        position: 'absolute',
+        top: Platform.OS === 'ios' ? 50 : 40,
+        left: 16,
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        backgroundColor: isDarkMode ? '#2D2D2D' : '#fff',
+        justifyContent: 'center',
+        alignItems: 'center',
+        shadowColor: '#000',
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+        shadowOffset: { width: 0, height: 2 },
+        elevation: 3,
+        zIndex: 20,
+      },
     });
   };
 
@@ -756,106 +1051,225 @@ const HomeScreenWithMap = ({ userName = "User" }) => {
     <View style={styles.container}>
       <StatusBar barStyle={isDarkMode ? "light-content" : "dark-content"} backgroundColor="transparent" translucent />
       <KeyboardAvoidingView 
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-        style={styles.container}
-        keyboardVerticalOffset={Platform.OS === "ios" ? 64 : 0}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        style={{ flex: 1 }}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 100 : 0}
       >
-        <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-          <View style={styles.container}>
-            {/* MAP */}
-            <View style={styles.mapContainer}>
+        <View style={styles.container}>
+          {/* MAP */}
+          <View style={styles.mapContainer}>
+            <Animated.View style={[
+              StyleSheet.absoluteFill,
+              {
+                transform: [
+                  { scale: mapScaleAnim }
+                ]
+              }
+            ]}>
               <MapView
                 ref={mapRef}
                 provider={PROVIDER_DEFAULT}
-                style={styles.map}
+                style={StyleSheet.absoluteFill}
                 region={region}
                 customMapStyle={darkMapStyle}
-                showsUserLocation
+                showsUserLocation={false}
                 showsMyLocationButton={false}
                 showsCompass={false}
                 rotateEnabled={false}
-                mapPadding={{ top: 5, right: 0, bottom: Platform.OS === 'ios' ? 350 : 100, left: 0 }}
+                mapPadding={{ 
+                  top: -100, 
+                  right: 0, 
+                  bottom: selectionMode ? 0 : Platform.OS === 'ios' ? 350 : 100, 
+                  left: 0 
+                }}
                 onPress={handleMapPress}
+                onRegionChange={handleRegionChange}
+                onRegionChangeComplete={handleRegionChangeComplete}
+                moveOnMarkerPress={false}
+                scrollEnabled={true}
+                zoomEnabled={true}
+                pitchEnabled={false}
+                minZoomLevel={5}
+                maxZoomLevel={20}
               >
-                {fromLocation && (
-                  <Marker coordinate={fromLocation} title="Votre position" anchor={{ x: 0.5, y: 1 }}>
-                    <Image source={CustomPin} style={{ width: 40, height: 40 }} resizeMode="contain" />
+                {/* Always show the pickup marker unless we're selecting a new pickup */}
+                {(fromLocation && (selectionMode !== 'pickup')) && (
+                  <Marker coordinate={fromLocation} title="Votre position" anchor={{ x: 0.5, y: 0.5 }}>
+                    <View style={{
+                      width: 32,
+                      height: 32,
+                      backgroundColor: '#FF6F00',
+                      borderRadius: 16,
+                      borderWidth: 2,
+                      borderColor: '#fff',
+                      justifyContent: 'center',
+                      alignItems: 'center',
+                      shadowColor: '#000',
+                      shadowOffset: { width: 0, height: 2 },
+                      shadowOpacity: 0.3,
+                      shadowRadius: 4,
+                      elevation: 5,
+                    }}>
+                      <Ionicons name="location" size={16} color="#fff" />
+                    </View>
                   </Marker>
                 )}
-                {selectedLocation && (
-                  <Marker coordinate={selectedLocation} title={selectionMode === 'pickup' ? "Point de départ" : "Destination"}>
+                {/* Show the dropoff marker if we're in dropoff selection mode and a location is selected */}
+                {(selectionMode === 'dropoff' && selectedLocation) && (
+                  <Marker coordinate={selectedLocation} title="Arrivée" anchor={{ x: 0.5, y: 0.5 }}>
                     <View style={{ 
-                      backgroundColor: selectionMode === 'pickup' ? '#FF6F00' : '#4CAF50',
-                      padding: 8,
-                      borderRadius: 20,
+                      width: 32,
+                      height: 32,
+                      backgroundColor: '#4CAF50',
+                      borderRadius: 16,
                       borderWidth: 2,
-                      borderColor: '#fff'
+                      borderColor: '#fff',
+                      justifyContent: 'center',
+                      alignItems: 'center',
+                      shadowColor: '#000',
+                      shadowOffset: { width: 0, height: 2 },
+                      shadowOpacity: 0.3,
+                      shadowRadius: 4,
+                      elevation: 5,
                     }}>
                       <Ionicons 
-                        name={selectionMode === 'pickup' ? "location" : "flag"} 
-                        size={20} 
+                        name="flag" 
+                        size={16} 
                         color="#fff" 
                       />
                     </View>
                   </Marker>
                 )}
               </MapView>
-
-              {/* Add map selection overlay */}
-              {!selectionMode && (
-                <View style={styles.mapSelectionOverlay}>
-                  <View style={styles.mapSelectionHeader}>
-                    <Ionicons name="map-outline" size={20} color="#FF6F00" />
-                    <Text style={styles.mapSelectionTitle}>Sélection sur la carte</Text>
-                  </View>
-                  <Text style={styles.mapSelectionText}>
-                    Appuyez sur les boutons ci-dessous pour sélectionner votre trajet sur la carte.
-                  </Text>
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 8 }}>
-                    <TouchableOpacity 
-                      style={[styles.mapSelectionButton, { flex: 1, marginRight: 8 }]} 
-                      onPress={() => startLocationSelection('pickup')}
-                    >
-                      <Text style={styles.mapSelectionButtonText}>Départ</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity 
-                      style={[styles.mapSelectionButton, { flex: 1, marginLeft: 8 }]} 
-                      onPress={() => startLocationSelection('dropoff')}
-                    >
-                      <Text style={styles.mapSelectionButtonText}>Arrivée</Text>
-                    </TouchableOpacity>
+              {/* Fixed pin overlay in the center when in selection mode */}
+              {selectionMode && (
+                <View pointerEvents="none" style={{
+                  position: 'absolute',
+                  top: '50%',
+                  left: '50%',
+                  marginLeft: -24,
+                  marginTop: -48,
+                  zIndex: 20,
+                }}>
+                  <View style={{
+                    backgroundColor: '#fff',
+                    borderRadius: 24,
+                    padding: 2,
+                    shadowColor: '#000',
+                    shadowOpacity: 0.3,
+                    shadowOffset: { width: 0, height: 2 },
+                    shadowRadius: 4,
+                    elevation: 5,
+                  }}>
+                    <View style={{
+                      backgroundColor: '#FF6F00',
+                      borderRadius: 20,
+                      padding: 8,
+                      borderWidth: 2,
+                      borderColor: '#fff',
+                    }}>
+                      <Ionicons 
+                        name="location" 
+                        size={32} 
+                        color="#fff" 
+                        style={{ 
+                          opacity: 0.95,
+                        }} 
+                      />
+                    </View>
                   </View>
                 </View>
               )}
+            </Animated.View>
 
-              {/* Selection mode indicator */}
-              {selectionMode && (
-                <View style={[styles.mapSelectionOverlay, { backgroundColor: isDarkMode ? 'rgba(255, 111, 0, 0.2)' : 'rgba(255, 111, 0, 0.1)' }]}>
-                  <View style={styles.mapSelectionHeader}>
-                    <Ionicons 
-                      name={selectionMode === 'pickup' ? "location" : "flag"} 
-                      size={20} 
-                      color="#FF6F00" 
-                    />
-                    <Text style={styles.mapSelectionTitle}>
-                      {selectionMode === 'pickup' ? 'Sélectionnez le point de départ' : 'Sélectionnez la destination'}
-                    </Text>
-                  </View>
-                  <Text style={styles.mapSelectionText}>
-                    Appuyez sur la carte pour placer le marqueur.
-                  </Text>
+            {/* Back button in selection mode */}
+            {selectionMode && (
+              <TouchableOpacity 
+                style={styles.backButton} 
+                onPress={handleCancelSelection}
+              >
+                <Ionicons 
+                  name="arrow-back" 
+                  size={24} 
+                  color={isDarkMode ? "#fff" : "#000"} 
+                />
+              </TouchableOpacity>
+            )}
+
+            {/* Map selection overlay */}
+            {!selectionMode && (
+              <Animated.View style={[
+                styles.mapSelectionOverlay,
+                {
+                  opacity: fadeAnim,
+                  transform: [
+                    { translateY: slideAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [0, -20]
+                    })}
+                  ]
+                }
+              ]}>
+                <View style={styles.mapSelectionHeader}>
+                  <Ionicons name="map-outline" size={20} color="#FF6F00" />
+                  <Text style={styles.mapSelectionTitle}>Sélection sur la carte</Text>
+                </View>
+                <Text style={styles.mapSelectionText}>
+                  Appuyez sur les boutons ci-dessous pour sélectionner votre trajet sur la carte.
+                </Text>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 8 }}>
                   <TouchableOpacity 
-                    style={[styles.mapSelectionButton, { backgroundColor: isDarkMode ? '#2D2D2D' : '#F3F4F6' }]} 
-                    onPress={() => setSelectionMode(null)}
+                    style={[styles.mapSelectionButton, { flex: 1, marginRight: 8 }]} 
+                    onPress={() => startLocationSelection('pickup')}
                   >
-                    <Text style={[styles.mapSelectionButtonText, { color: isDarkMode ? '#B0B0B0' : '#4B5563' }]}>Annuler</Text>
+                    <Text style={styles.mapSelectionButtonText}>Départ</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity 
+                    style={[styles.mapSelectionButton, { flex: 1, marginLeft: 8 }]} 
+                    onPress={() => startLocationSelection('dropoff')}
+                  >
+                    <Text style={styles.mapSelectionButtonText}>Arrivée</Text>
                   </TouchableOpacity>
                 </View>
-              )}
-            </View>
+              </Animated.View>
+            )}
 
-            {/* TOP BAR WITH THEME TOGGLE */}
-            <View style={styles.topBar}>
+            {/* Selection mode bottom sheet */}
+            {selectionMode && (
+              <View style={styles.selectionBottomSheet}>
+                <Text style={styles.selectionTitle}>Set your destination</Text>
+                <Text style={styles.selectionSubtitle}>Drag map to move pin</Text>
+                <View style={styles.selectionSearchBar}>
+                  <Ionicons name="location-outline" size={20} color="#FF6F00" style={{ marginLeft: 8 }} />
+                  <Text style={styles.selectionSearchText}>{searchText || 'Search for a place'}</Text>
+                  <TouchableOpacity style={{ marginRight: 8 }}>
+                    <Ionicons name="search" size={20} color="#FF6F00" />
+                  </TouchableOpacity>
+                </View>
+                <TouchableOpacity style={styles.selectionConfirmButton} onPress={() => handleMapPress({ nativeEvent: { coordinate: region } })}>
+                  <Text style={styles.selectionConfirmButtonText}>Confirm destination</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.selectionCancelButton} onPress={handleCancelSelection}>
+                  <Text style={styles.selectionCancelButtonText}>Cancel</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
+
+          {/* TOP BAR WITH THEME TOGGLE */}
+          {!selectionMode && (
+            <Animated.View style={[
+              styles.topBar,
+              {
+                opacity: fadeAnim,
+                transform: [
+                  { translateY: slideAnim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [0, -20]
+                  })}
+                ]
+              }
+            ]}>
               <Image source={CavalLogo} style={styles.logo} />
               <View style={{ flexDirection: "row" }}>
                 <TouchableOpacity style={styles.themeToggleButton} onPress={toggleTheme}>
@@ -865,25 +1279,36 @@ const HomeScreenWithMap = ({ userName = "User" }) => {
                   <Ionicons name="locate" size={24} color="#FF6F00" />
                 </TouchableOpacity>
               </View>
-            </View>
+            </Animated.View>
+          )}
 
-            {/* ACTIVE RIDE BANNER */}
-            {route.params?.activeRide && (
-              <TouchableOpacity style={styles.activeRideBanner} onPress={() => navigation.navigate("DriverFoundScreen", route.params.activeRide)}>
-                <LinearGradient colors={["#FF9500", "#FF6F00"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.activeRideBannerGradient}>
-                  <Ionicons name="car-sport" size={20} color="#fff" style={{ marginRight: 8 }} />
-                  <Text style={styles.activeRideBannerText}>Vous avez une course en cours</Text>
-                  <Ionicons name="chevron-forward" size={20} color="#fff" />
-                </LinearGradient>
-              </TouchableOpacity>
-            )}
+          {/* ACTIVE RIDE BANNER */}
+          {!selectionMode && route.params?.activeRide && (
+            <TouchableOpacity style={styles.activeRideBanner} onPress={() => navigation.navigate("DriverFoundScreen", route.params.activeRide)}>
+              <LinearGradient colors={["#FF9500", "#FF6F00"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.activeRideBannerGradient}>
+                <Ionicons name="car-sport" size={20} color="#fff" style={{ marginRight: 8 }} />
+                <Text style={styles.activeRideBannerText}>Vous avez une course en cours</Text>
+                <Ionicons name="chevron-forward" size={20} color="#fff" />
+              </LinearGradient>
+            </TouchableOpacity>
+          )}
 
-            {/* BOTTOM CONTAINER */}
-            <View style={[
+          {/* BOTTOM CONTAINER */}
+          {!selectionMode && (
+            <Animated.View style={[
               styles.bottomContainer,
-              isSearchFocused && { 
-                maxHeight: '80%',
-                paddingBottom: Platform.OS === 'ios' ? 20 : 0
+              {
+                position: 'absolute',
+                bottom: keyboardVisible ? keyboardHeight - 50 : Platform.OS === 'android' ? 20 : 0,
+                left: 0,
+                right: 0,
+                opacity: fadeAnim,
+                transform: [
+                  { translateY: slideAnim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [0, 100]
+                  })}
+                ]
               }
             ]}>
               <View style={styles.bottomContainerHeader}>
@@ -914,9 +1339,9 @@ const HomeScreenWithMap = ({ userName = "User" }) => {
                       fetchDetails
                       onPress={handlePickupSelect}
                       query={{
-                        key: GOOGLE_MAPS_APIKEY,
+                        key: GOOGLE_API_KEY,
                         language: "fr",
-                        components: "country:DJ", // Restrict results to Djibouti
+                        components: "country:DJ",
                       }}
                       debounce={400}
                       listViewDisplayed="auto"
@@ -939,14 +1364,42 @@ const HomeScreenWithMap = ({ userName = "User" }) => {
                         </View>
                       )}
                       predefinedPlaces={[]}
-                      ListViewProps={{ showsVerticalScrollIndicator: true }}
-                      styles={{
-                        container: { ...styles.searchContainer, flex: 1 },
-                        textInput: styles.searchInput,
-                        listView: { ...styles.autocompleteListView, position: "absolute", top: 52, left: 0, right: 0 },
+                      ListViewProps={{ 
+                        showsVerticalScrollIndicator: true,
+                        scrollEnabled: true,
+                        nestedScrollEnabled: true,
+                        keyboardShouldPersistTaps: "handled"
                       }}
-                      enablePoweredByContainer={false}
-                      minLength={2}
+                      styles={{
+                        container: {
+                          flex: 1,
+                          backgroundColor: 'transparent',
+                        },
+                        textInput: {
+                          height: 50,
+                          borderRadius: 10,
+                          backgroundColor: isDarkMode ? "#2D2D2D" : "#F3F4F6",
+                          paddingHorizontal: 16,
+                          fontSize: 16,
+                          color: isDarkMode ? "#fff" : "#333",
+                          borderWidth: 1,
+                          borderColor: isDarkMode ? "#444" : "#ddd",
+                        },
+                        listView: {
+                          backgroundColor: isDarkMode ? "#2D2D2D" : "#fff",
+                          borderRadius: 10,
+                          borderWidth: 1,
+                          borderColor: "#FF6F00",
+                          elevation: 5,
+                          shadowColor: "#000",
+                          shadowOffset: { width: 0, height: 2 },
+                          shadowOpacity: 0.2,
+                          shadowRadius: 8,
+                          marginTop: 4,
+                          maxHeight: 200,
+                          zIndex: 9999,
+                        }
+                      }}
                     />
                     <TouchableOpacity style={styles.cancelButton} onPress={() => { setShowPickupInput(false); setPickupInputVisible(false); }}>
                       <Text style={styles.cancelButtonText}>Annuler</Text>
@@ -963,23 +1416,23 @@ const HomeScreenWithMap = ({ userName = "User" }) => {
               )}
 
               <View style={styles.destinationRowContainer}>
-                <View style={styles.destinationIconContainer}>
+                <View style={[styles.destinationIconContainer, Platform.OS === 'android' && { top: 12 }]}>
                   <Ionicons name="navigate-outline" size={20} color="#FF6F00" />
                 </View>
-                <View style={{ flex: 1 }}>
+                <View style={styles.destinationSearchContainer}>
                   <GooglePlacesAutocomplete
                     ref={googlePlacesRef}
                     placeholder="Où souhaitez-vous aller ?"
                     fetchDetails={true}
                     onPress={handleDestinationSelect}
                     query={{
-                      key: GOOGLE_MAPS_APIKEY,
+                      key: GOOGLE_API_KEY,
                       language: "fr",
-                      components: "country:DJ"
+                      components: "country:DJ",
                     }}
                     debounce={400}
-                    listViewDisplayed={false}
-                    keyboardShouldPersistTaps="always"
+                    listViewDisplayed={true}
+                    keyboardShouldPersistTaps="handled"
                     textInputProps={{
                       value: searchText,
                       onChangeText: setSearchText,
@@ -990,15 +1443,19 @@ const HomeScreenWithMap = ({ userName = "User" }) => {
                     predefinedPlaces={[]}
                     ListViewProps={{ 
                       showsVerticalScrollIndicator: true,
-                      keyboardShouldPersistTaps: "always"
+                      scrollEnabled: true,
+                      nestedScrollEnabled: true,
+                      keyboardShouldPersistTaps: "handled",
+                      style: styles.autocompleteListView,
                     }}
                     styles={{
                       container: styles.destinationSearchContainer,
                       textInput: styles.destinationSearchInput,
-                      listView: { ...styles.autocompleteListView, position: "absolute", top: 52, left: 0, right: 0 },
+                      listView: styles.autocompleteListView,
                     }}
                     enablePoweredByContainer={false}
                     minLength={2}
+                    timeout={10000}
                     onFail={(error) => {
                       console.log('GooglePlacesAutocomplete Error:', error);
                       setSearchText('');
@@ -1025,21 +1482,6 @@ const HomeScreenWithMap = ({ userName = "User" }) => {
                   </TouchableOpacity>
                 </View>
               </View>
-
-              {/* Add selection mode indicator */}
-              {selectionMode && (
-                <View style={[styles.selectedAddressContainer, { backgroundColor: '#FF6F00' }]}>
-                  <Text style={[styles.selectedAddressText, { color: '#fff' }]}>
-                    {selectionMode === 'pickup' ? 'Sélectionnez le point de départ sur la carte' : 'Sélectionnez la destination sur la carte'}
-                  </Text>
-                  <TouchableOpacity 
-                    style={{ marginLeft: 8 }} 
-                    onPress={() => setSelectionMode(null)}
-                  >
-                    <Ionicons name="close" size={20} color="#fff" />
-                  </TouchableOpacity>
-                </View>
-              )}
 
               {recentSearches.length > 0 && (
                 <View style={styles.recentSearchesContainer}>
@@ -1084,9 +1526,9 @@ const HomeScreenWithMap = ({ userName = "User" }) => {
                   maxHeight={150}
                 />
               )}
-            </View>
-          </View>
-        </TouchableWithoutFeedback>
+            </Animated.View>
+          )}
+        </View>
       </KeyboardAvoidingView>
     </View>
   );

@@ -588,7 +588,7 @@ function ActivityScreen() {
                       </Text>
                       <TouchableOpacity 
                         style={[styles.newRideButton, { backgroundColor: colors.accent }]}
-                        onPress={() => navigation.navigate("HomeTabs")}
+                        onPress={() => navigation.navigate("Home")}
                       >
                         <Text style={styles.newRideButtonText}>Demander un taxi</Text>
                       </TouchableOpacity>

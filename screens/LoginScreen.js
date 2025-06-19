@@ -16,7 +16,6 @@ import {
 import { useNavigation } from "@react-navigation/native";
 import { 
   signInWithEmailAndPassword,
-  GoogleAuthProvider,
   signInWithCredential,
   PhoneAuthProvider,
   RecaptchaVerifier,
@@ -25,15 +24,11 @@ import { doc, getDoc, setDoc, updateDoc, serverTimestamp } from "firebase/firest
 import CavalLogo from "../assets/Caval_Logo-removebg-preview.png";
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import * as Google from 'expo-auth-session/providers/google';
-import * as WebBrowser from 'expo-web-browser';
 import { auth, firestore } from "../firebase.config";
 import { LinearGradient } from "expo-linear-gradient";
 import CustomPhoneInput from "./CustomPhoneInput";
 import { FirebaseRecaptchaVerifierModal } from 'expo-firebase-recaptcha';
 import { firebaseConfig } from '../firebase.config';
-
-WebBrowser.maybeCompleteAuthSession();
 
 function LoginScreen() {
   const [email, setEmail] = useState("");
@@ -52,13 +47,6 @@ function LoginScreen() {
   const phoneInput = useRef(null);
   const recaptchaVerifier = useRef(null);
 
-  // Google Sign-In Configuration
-  const [request, response, promptAsync] = Google.useIdTokenAuthRequest({
-    clientId: 'YOUR_GOOGLE_CLIENT_ID', // Replace with your actual client ID
-    androidClientId: 'YOUR_ANDROID_CLIENT_ID', // Replace with your Android client ID
-    iosClientId: 'YOUR_IOS_CLIENT_ID', // Replace with your iOS client ID
-  });
-
   // Set up reCAPTCHA verifier
   useEffect(() => {
     if (Platform.OS === 'web') {
@@ -76,15 +64,6 @@ function LoginScreen() {
       });
     }
   }, []);
-
-  // Handle Google Sign-In response
-  useEffect(() => {
-    if (response?.type === 'success') {
-      const { id_token } = response.params;
-      const credential = GoogleAuthProvider.credential(id_token);
-      signInWithGoogle(credential);
-    }
-  }, [response]);
 
   // Load theme preference on component mount
   useEffect(() => {
@@ -119,53 +98,72 @@ function LoginScreen() {
 
   const handleLogin = async () => {
     if (loginMethod === "email") {
-      if (!email || !password) {
-        Alert.alert("Attention", "Veuillez remplir tous les champs");
-        return;
-      }
-
       try {
         setLoading(true);
+        setError('');
+        
+        if (!email || !password) {
+          setError('Veuillez remplir tous les champs');
+          setLoading(false);
+          return;
+        }
+
         const userCredential = await signInWithEmailAndPassword(auth, email, password);
         const user = userCredential.user;
-        console.log("User signed in successfully:", user.email);
-
-        // Check if user document exists in Firestore
-        const docRef = doc(firestore, "Customers", user.uid);
-        const docSnap = await getDoc(docRef);
-
-        if (!docSnap.exists()) {
-          // Create user document if it doesn't exist
-          await setDoc(docRef, {
+        
+        // Fetch complete user data from Firestore
+        const userRef = doc(firestore, 'Customers', user.uid);
+        const userDoc = await getDoc(userRef);
+        
+        let userData;
+        if (userDoc.exists()) {
+          const firestoreData = userDoc.data();
+          userData = {
+            uid: user.uid,
+            email: user.email,
+            displayName: user.displayName,
+            photoURL: user.photoURL,
+            emailVerified: user.emailVerified,
+            refreshToken: user.refreshToken,
+            tokenTimestamp: Date.now(),
+            provider: 'email',
+            isAuthenticated: true,
+            // Include Firestore data
+            firstName: firestoreData.firstName || user.displayName?.split(' ')[0] || "",
+            lastName: firestoreData.lastName || user.displayName?.split(' ').slice(1).join(' ') || "",
+            number: firestoreData.number || "",
+            photo: firestoreData.photo || user.photoURL || null,
+            ...firestoreData
+          };
+        } else {
+          // Create user document in Firestore
+          const defaultUserData = {
             email: user.email,
             firstName: user.displayName?.split(' ')[0] || "",
             lastName: user.displayName?.split(' ').slice(1).join(' ') || "",
             photo: user.photoURL || null,
-            createdAt: serverTimestamp(),
             lastLogin: serverTimestamp(),
-            authProvider: "email"
-          });
-          console.log("Created new user document in Firestore");
-        } else {
-          // Update last login time
-          await updateDoc(docRef, {
-            lastLogin: serverTimestamp()
-          });
-          console.log("Updated last login time");
+            loginMethod: 'email',
+            updatedAt: serverTimestamp(),
+            createdAt: serverTimestamp(),
+            authProvider: 'email'
+          };
+          
+          await setDoc(userRef, defaultUserData);
+          
+          userData = {
+            uid: user.uid,
+            email: user.email,
+            displayName: user.displayName,
+            photoURL: user.photoURL,
+            emailVerified: user.emailVerified,
+            refreshToken: user.refreshToken,
+            tokenTimestamp: Date.now(),
+            provider: 'email',
+            isAuthenticated: true,
+            ...defaultUserData
+          };
         }
-
-        // Store user data in AsyncStorage for persistent auth
-        const userData = {
-          uid: user.uid,
-          email: user.email,
-          displayName: user.displayName,
-          photoURL: user.photoURL,
-          emailVerified: user.emailVerified,
-          refreshToken: user.refreshToken,
-          tokenTimestamp: Date.now(),
-          provider: 'email',
-          isAuthenticated: true
-        };
         
         await AsyncStorage.setItem('userData', JSON.stringify(userData));
         
@@ -195,49 +193,6 @@ function LoginScreen() {
     }
   };
 
-  const signInWithGoogle = async (credential) => {
-    try {
-      setLoading(true);
-      const userCredential = await signInWithCredential(auth, credential);
-      
-      // Store user credentials in AsyncStorage for persistence
-      const userData = {
-        uid: userCredential.user.uid,
-        email: userCredential.user.email,
-        displayName: userCredential.user.displayName,
-        photoURL: userCredential.user.photoURL,
-        emailVerified: userCredential.user.emailVerified,
-        refreshToken: userCredential.user.refreshToken,
-        tokenTimestamp: Date.now(),
-        provider: 'google', // Mark this as a Google sign-in
-        isAuthenticated: true
-      };
-      
-      // Create or update user document in Firestore
-      const userRef = doc(firestore, 'Customers', userCredential.user.uid);
-      await setDoc(userRef, {
-        email: userCredential.user.email,
-        firstName: userCredential.user.displayName?.split(' ')[0] || "",
-        lastName: userCredential.user.displayName?.split(' ').slice(1).join(' ') || "",
-        photo: userCredential.user.photoURL || null,
-        lastLogin: serverTimestamp(),
-        loginMethod: 'google',
-        updatedAt: serverTimestamp()
-      }, { merge: true });
-      
-      await AsyncStorage.setItem('userData', JSON.stringify(userData));
-      // Also save to userCredentials for consistency
-      await AsyncStorage.setItem('userCredentials', JSON.stringify(userData));
-      
-      setLoading(false);
-      navigation.navigate("HomeTabs");
-    } catch (error) {
-      setLoading(false);
-      console.log(error);
-      Alert.alert("Erreur de connexion", "La connexion avec Google a échoué. Veuillez réessayer.");
-    }
-  };
-  
   const sendVerificationCode = async () => {
     try {
       setLoading(true);
@@ -475,6 +430,14 @@ function LoginScreen() {
           resizeMode="contain"
         />
 
+        {/* Welcome Header */}
+        <View style={styles.welcomeContainer}>
+          <Text style={styles.welcomeTitle}>Bienvenue !</Text>
+          <Text style={styles.welcomeSubtitle}>
+            Connectez-vous pour accéder à vos services
+          </Text>
+        </View>
+
         <View style={styles.card}>
           {/* Login Method Tabs */}
           <View style={styles.tabContainer}>
@@ -602,6 +565,14 @@ function LoginScreen() {
                 </>
               ) : (
                 <>
+                  <View style={styles.verificationContainer}>
+                    <Ionicons name="shield-checkmark" size={40} color="#ff9f43" style={styles.verificationIcon} />
+                    <Text style={styles.verificationTitle}>Vérification</Text>
+                    <Text style={styles.verificationSubtitle}>
+                      Entrez le code envoyé à votre téléphone
+                    </Text>
+                  </View>
+                  
                   <View style={styles.inputContainer}>
                     <Ionicons name="keypad" size={20} color="#aaa" style={styles.inputIcon} />
                     <TextInput
@@ -656,34 +627,38 @@ function LoginScreen() {
               <Text style={styles.forgotText}>Mot de passe oublié ?</Text>
             </TouchableOpacity>
           )}
-
-          {/* Divider */}
-          <View style={styles.dividerContainer}>
-            <View style={styles.divider} />
-            <Text style={styles.dividerText}>ou</Text>
-            <View style={styles.divider} />
-          </View>
-
-          {/* Google Sign-In Button */}
-          <TouchableOpacity 
-            style={styles.googleButton} 
-            onPress={() => promptAsync()}
-            activeOpacity={0.8}
-            disabled={!request || loading}
-          >
-            <View style={styles.googleButtonContent}>
-              <Ionicons name="logo-google" size={20} color="#fff" />
-              <Text style={styles.googleButtonText}>Se connecter avec Google</Text>
-            </View>
-          </TouchableOpacity>
         </View>
 
+        {/* Registration Link - Moved between card and features */}
         <Text
           style={styles.linkText}
           onPress={() => navigation.navigate("RegisterScreen")}
         >
           Vous n'avez pas de compte ? <Text style={styles.linkTextHighlight}>Inscrivez-vous ici</Text>
         </Text>
+
+        {/* Features Section */}
+        <View style={styles.featuresContainer}>
+          <Text style={styles.featuresTitle}>Pourquoi choisir Caval ?</Text>
+          <View style={styles.featuresGrid}>
+            <View style={styles.featureItem}>
+              <Ionicons name="flash" size={24} color="#ff9f43" />
+              <Text style={styles.featureText}>Rapide</Text>
+            </View>
+            <View style={styles.featureItem}>
+              <Ionicons name="shield-checkmark" size={24} color="#ff9f43" />
+              <Text style={styles.featureText}>Sécurisé</Text>
+            </View>
+            <View style={styles.featureItem}>
+              <Ionicons name="location" size={24} color="#ff9f43" />
+              <Text style={styles.featureText}>Précis</Text>
+            </View>
+            <View style={styles.featureItem}>
+              <Ionicons name="heart" size={24} color="#ff9f43" />
+              <Text style={styles.featureText}>Fiable</Text>
+            </View>
+          </View>
+        </View>
       </ScrollView>
     </LinearGradient>
   );
@@ -698,7 +673,7 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     justifyContent: "flex-start",
     padding: 20,
-    paddingTop: Platform.OS === 'android' ? -20 : 40, // Negative padding for Android
+    paddingTop: Platform.OS === 'android' ? 20 : 80, // Increased top padding further
     backgroundColor: 'transparent',
   },
   themeToggle: {
@@ -714,7 +689,26 @@ const styles = StyleSheet.create({
     height: undefined,
     aspectRatio: 1,
     alignSelf: "center",
-    marginBottom: Platform.OS === 'android' ? -25 : 15, // Increased negative margin for Android
+    marginBottom: Platform.OS === 'android' ? -10 : 5, // Reduced negative margin to bring content up
+  },
+  welcomeContainer: {
+    alignItems: "center",
+    marginBottom: 35,
+    paddingHorizontal: 20,
+    marginTop: -40, // Much larger negative margin to raise significantly higher
+  },
+  welcomeTitle: {
+    fontSize: 28,
+    fontWeight: "700",
+    color: "#fff",
+    marginBottom: 8,
+    textAlign: "center",
+  },
+  welcomeSubtitle: {
+    fontSize: 16,
+    color: "#bbb",
+    textAlign: "center",
+    lineHeight: 22,
   },
   card: {
     backgroundColor: "#1e1e1e",
@@ -726,7 +720,8 @@ const styles = StyleSheet.create({
     shadowRadius: 15,
     elevation: 8,
     marginHorizontal: 6,
-    marginTop: Platform.OS === 'android' ? -40 : 5, // Much larger negative margin for Android
+    marginTop: Platform.OS === 'android' ? -20 : 10, // Adjusted margin to work with raised welcome section
+    marginBottom: 20,
   },
   tabContainer: {
     flexDirection: "row",
@@ -807,7 +802,8 @@ const styles = StyleSheet.create({
   },
   linkText: {
     textAlign: "center",
-    marginTop: Platform.OS === 'android' ? 15 : 20, // Positive margin to move text lower
+    marginTop: 15,
+    marginBottom: 20,
     fontSize: 16,
     color: "#aaa",
   },
@@ -821,44 +817,6 @@ const styles = StyleSheet.create({
     marginTop: 15,
     fontSize: 16,
     fontWeight: "500",
-  },
-  dividerContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginVertical: 25,
-  },
-  divider: {
-    flex: 1,
-    height: 1,
-    backgroundColor: "#333",
-  },
-  dividerText: {
-    marginHorizontal: 10,
-    fontSize: 14,
-    color: "#aaa",
-  },
-  googleButton: {
-    backgroundColor: "#4285F4",
-    paddingVertical: 16,
-    borderRadius: 12,
-    marginTop: 5,
-    shadowColor: "#4285F4",
-    shadowOpacity: 0.3,
-    shadowOffset: { width: 0, height: 4 },
-    shadowRadius: 8,
-    elevation: 5,
-  },
-  googleButtonContent: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  googleButtonText: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "600",
-    marginLeft: 10,
-    textAlign: "center",
   },
   nameContainer: {
     flexDirection: "row",
@@ -910,6 +868,62 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 10,
     lineHeight: 18,
+  },
+  verificationContainer: {
+    alignItems: "center",
+    marginBottom: 20,
+    paddingVertical: 15,
+  },
+  verificationIcon: {
+    marginBottom: 10,
+  },
+  verificationTitle: {
+    fontSize: 20,
+    fontWeight: "700",
+    color: "#fff",
+    marginBottom: 5,
+  },
+  verificationSubtitle: {
+    fontSize: 14,
+    color: "#bbb",
+    textAlign: "center",
+    lineHeight: 20,
+  },
+  featuresContainer: {
+    backgroundColor: "#1e1e1e",
+    borderRadius: 16,
+    padding: 20,
+    marginHorizontal: 6,
+    marginBottom: 20,
+    shadowColor: "#000",
+    shadowOpacity: 0.1,
+    shadowOffset: { width: 0, height: 3 },
+    shadowRadius: 10,
+    elevation: 5,
+  },
+  featuresTitle: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: "#fff",
+    textAlign: "center",
+    marginBottom: 15,
+  },
+  featuresGrid: {
+    flexDirection: "row",
+    justifyContent: "space-around",
+    flexWrap: "wrap",
+  },
+  featureItem: {
+    alignItems: "center",
+    width: "25%",
+    paddingVertical: 10,
+  },
+  featureText: {
+    fontSize: 12,
+    color: "#bbb",
+    marginTop: 5,
+    textAlign: "center",
+    fontWeight: "500",
   },
 });
 

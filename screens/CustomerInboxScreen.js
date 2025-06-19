@@ -212,7 +212,7 @@ const CustomerInboxScreen = () => {
       <KeyboardAvoidingView
         style={styles.container}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 35}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 40}
       >
         <View style={styles.mainContent}>
           {/* Header */}
@@ -297,7 +297,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#1e1e1e',
-    paddingBottom: Platform.OS === 'android' ? 35 : 0,
   },
   mainContent: {
     flex: 1,
@@ -344,7 +343,7 @@ const styles = StyleSheet.create({
   },
   messagesList: {
     padding: 12,
-    paddingBottom: Platform.OS === 'android' ? 80 : 120,
+    paddingBottom: 20,
   },
   messageContainer: {
     flexDirection: 'row',
@@ -395,18 +394,15 @@ const styles = StyleSheet.create({
   },
   inputContainer: {
     flexDirection: 'row',
-    padding: 8,
-    paddingBottom: Platform.OS === 'ios' ? 20 : 8,
+    padding: Platform.OS === 'ios' ? 8 : 16,
+    paddingBottom: Platform.OS === 'ios' ? 20 : 24,
     backgroundColor: '#1e1e1e',
     borderTopWidth: 1,
     borderTopColor: '#333',
-    position: 'absolute',
-    bottom: Platform.OS === 'android' ? 35 : 0,
-    left: 0,
-    right: 0,
     elevation: 5,
     zIndex: 1000,
-    height: Platform.OS === 'android' ? 70 : 60,
+    minHeight: Platform.OS === 'android' ? 90 : 60,
+    marginBottom: Platform.OS === 'android' ? 20 : 0,
   },
   attachButton: {
     marginRight: 8,

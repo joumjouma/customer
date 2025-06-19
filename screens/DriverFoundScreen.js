@@ -225,6 +225,14 @@ const DriverFoundScreen = () => {
 
   // Set destination using available parameters
   useEffect(() => {
+    console.log("Destination debug:", {
+      destination,
+      passedDropOffLocation,
+      destinationLat,
+      destinationLng,
+      destinationAddress
+    });
+    
     if (destination) {
       setDestinationData(destination);
     } else if (passedDropOffLocation) {
@@ -530,40 +538,77 @@ const DriverFoundScreen = () => {
             </Marker>
           )}
           
+          {/* Test marker to verify markers work */}
+          <Marker 
+            coordinate={{ latitude: 11.5890, longitude: 43.1450 }}
+            pinColor="red"
+            title="Test Marker"
+            description="This is a test marker"
+          />
+          
           {/* Destination marker */}
-          {destinationData && (
+          {(() => {
+            console.log("=== DESTINATION DEBUG ===");
+            console.log("destinationData:", destinationData);
+            console.log("destination:", destination);
+            console.log("destinationLat:", destinationLat);
+            console.log("destinationLng:", destinationLng);
+            console.log("destinationAddress:", destinationAddress);
+            console.log("hasDestinationData:", !!(destinationData || destination));
+            console.log("hasCoords:", !!(destinationLat && destinationLng));
+            console.log("==========================");
+            return null;
+          })()}
+          {(destinationData || destination) && (
             <Marker 
               identifier="destination"
-              coordinate={destinationData} 
-              anchor={{ x: 0.5, y: 1 }} 
-              tracksViewChanges={false}
+              coordinate={destinationData || destination} 
+              pinColor="#FF6B00"
+              title="Destination"
+              description={(destinationData?.address || destination?.address) || "Destination"}
               zIndex={1000}
-            >
-              <View style={[styles.destinationMarkerContainer, { elevation: 5 }]}>
-                <View style={[styles.destinationPin, { elevation: 5 }]}>
-                  <Ionicons name="location" size={20} color="#fff" />
-                </View>
-                <Text style={[styles.destinationAddressPill, { elevation: 5 }]} numberOfLines={1}>
-                  {destinationData?.address || "Destination"}
-                </Text>
-              </View>
-            </Marker>
+            />
+          )}
+          
+          {/* Fallback destination marker if no destination data */}
+          {!destinationData && !destination && destinationLat && destinationLng && (
+            <Marker 
+              identifier="destination"
+              coordinate={{ latitude: parseFloat(destinationLat), longitude: parseFloat(destinationLng) }} 
+              pinColor="#FF6B00"
+              title="Destination"
+              description={destinationAddress || "Destination"}
+              zIndex={1000}
+            />
           )}
           
           {/* Driver marker */}
+          {(() => {
+            console.log("=== DRIVER DEBUG ===");
+            console.log("driverLocation:", driverLocation);
+            console.log("driverId:", driverId);
+            console.log("driverPhoto:", driverPhoto);
+            console.log("==========================");
+            return null;
+          })()}
           {driverLocation && (
-            <Marker coordinate={driverLocation} anchor={{ x: 0.5, y: 0.5 }} tracksViewChanges={false}>
-              <View style={styles.driverMarkerContainer}>
-                <Animated.View style={[styles.driverMarkerHalo, { transform: [{ scale: pulseAnim }] }]} />
-                <View style={styles.driverMarkerInner}>
-                  <Image
-                    source={driverPhoto ? { uri: driverPhoto } : require("../assets/driver_placeholder.png")}
-                    style={styles.driverMarker}
-                    resizeMode="cover"
-                  />
-                </View>
-              </View>
-            </Marker>
+            <Marker 
+              coordinate={driverLocation} 
+              pinColor="blue"
+              title="Driver"
+              description={driverName || "Your driver"}
+              zIndex={1000}
+            />
+          )}
+          
+          {/* Fallback driver marker if no driver location but we have driver data */}
+          {!driverLocation && driverId && (
+            <Marker 
+              coordinate={{ latitude: 11.5890, longitude: 43.1450 }} 
+              pinColor="blue"
+              title="Driver"
+              description="Driver location unavailable"
+            />
           )}
         </MapView>
 
@@ -717,15 +762,20 @@ const DriverFoundScreen = () => {
             <TouchableOpacity 
               style={styles.expandButton}
               onPress={toggleOverlayExpansion}
+              activeOpacity={0.7}
             >
-              <Text style={styles.expandButtonText}>
-                {expandedOverlay ? "Voir moins" : "Voir plus"}
-              </Text>
-              <Ionicons 
-                name={expandedOverlay ? "chevron-down" : "chevron-up"} 
-                size={16} 
-                color={THEME.textMuted} 
-              />
+              <View style={styles.expandButtonContent}>
+                <Text style={styles.expandButtonText}>
+                  {expandedOverlay ? "Voir moins" : "Voir plus"}
+                </Text>
+                <View style={styles.expandButtonIconContainer}>
+                  <Ionicons 
+                    name={expandedOverlay ? "chevron-down" : "chevron-up"} 
+                    size={16} 
+                    color={THEME.primary} 
+                  />
+                </View>
+              </View>
             </TouchableOpacity>
 
             {/* Expanded Content */}
@@ -1034,37 +1084,83 @@ const styles = StyleSheet.create({
     maxWidth: 120,
     textAlign: "center",
   },
-  destinationMarkerContainer: {
+  destinationPinContainer: {
     alignItems: "center",
     backgroundColor: 'transparent',
+    elevation: 10,
   },
-  destinationPin: {
+  pinShadow: {
+    position: "absolute",
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: "rgba(0, 0, 0, 0.2)",
+    top: 2,
+    elevation: 5,
+  },
+  pinBody: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
     backgroundColor: THEME.primary,
-    borderRadius: 16,
-    width: 32,
-    height: 32,
     justifyContent: "center",
     alignItems: "center",
+    borderWidth: 2,
+    borderColor: "#FFFFFF",
+    elevation: 10,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
   },
-  destinationAddressPill: {
-    backgroundColor: "rgba(30, 30, 30, 0.85)",
-    paddingVertical: 4,
-    paddingHorizontal: 8,
+  pinHead: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: "#fff",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  pinTail: {
+    position: "absolute",
+    bottom: -8,
+    width: 0,
+    height: 0,
+    backgroundColor: "transparent",
+    borderStyle: "solid",
+    borderLeftWidth: 6,
+    borderRightWidth: 6,
+    borderTopWidth: 8,
+    borderLeftColor: "transparent",
+    borderRightColor: "transparent",
+    borderTopColor: THEME.primary,
+  },
+  pinAddressContainer: {
+    position: "absolute",
+    bottom: -35,
+    backgroundColor: "rgba(30, 30, 30, 0.95)",
+    paddingVertical: 6,
+    paddingHorizontal: 10,
     borderRadius: 12,
-    fontSize: 10,
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.3)",
+    elevation: 8,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    maxWidth: 150,
+  },
+  pinAddressText: {
     color: "#FFFFFF",
-    marginTop: 6,
-    overflow: "hidden",
-    maxWidth: 120,
+    fontSize: 11,
+    fontWeight: "600",
     textAlign: "center",
   },
   driverMarkerContainer: {
     alignItems: "center",
     justifyContent: "center",
+    elevation: 10,
   },
   driverMarkerHalo: {
     position: "absolute",
@@ -1072,6 +1168,7 @@ const styles = StyleSheet.create({
     height: 48,
     borderRadius: 24,
     backgroundColor: "rgba(255, 107, 0, 0.2)",
+    elevation: 5,
   },
   driverMarkerInner: {
     width: 36,
@@ -1083,6 +1180,11 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: "#FFFFFF",
     overflow: "hidden",
+    elevation: 10,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
   },
   driverMarker: {
     width: 32,
@@ -1236,7 +1338,7 @@ const styles = StyleSheet.create({
   // Bottom Overlay
   overlayContainer: {
     position: "absolute",
-    bottom: 30,
+    bottom: 0,
     left: 0,
     right: 0,
     height: COLLAPSED_HEIGHT,
@@ -1267,7 +1369,7 @@ const styles = StyleSheet.create({
   driverInfoContainer: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 20,
+    marginBottom: Platform.OS === "ios" ? 20 : 8,
   },
   driverImageWrapper: {
     position: "relative",
@@ -1343,7 +1445,7 @@ const styles = StyleSheet.create({
   actionButtons: {
     flexDirection: "row",
     justifyContent: "space-between",
-    marginBottom: 16,
+    marginBottom: Platform.OS === "ios" ? 16 : 4,
   },
   actionButton: {
     flex: 1,
@@ -1352,7 +1454,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     backgroundColor: THEME.cardLight,
     borderRadius: 12,
-    paddingVertical: 12,
+    paddingVertical: Platform.OS === "ios" ? 12 : 6,
     marginHorizontal: 4,
   },
   callButton: {
@@ -1361,7 +1463,7 @@ const styles = StyleSheet.create({
   actionButtonText: {
     fontSize: 12,
     color: THEME.textSecondary,
-    marginTop: 6,
+    marginTop: Platform.OS === "ios" ? 6 : 3,
   },
   
   // Expand Section
@@ -1369,12 +1471,37 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    paddingVertical: 8,
+    paddingVertical: Platform.OS === "ios" ? 12 : 4,
+    paddingHorizontal: 16,
+    backgroundColor: THEME.cardLight,
+    borderRadius: 12,
+    marginTop: Platform.OS === "ios" ? 8 : 2,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+    borderWidth: 1,
+    borderColor: "rgba(255, 107, 0, 0.2)",
+  },
+  expandButtonContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
   },
   expandButtonText: {
-    color: THEME.textMuted,
-    fontSize: 14,
-    marginRight: 4,
+    color: THEME.primary,
+    fontSize: 15,
+    fontWeight: "600",
+    marginRight: 8,
+  },
+  expandButtonIconContainer: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: "rgba(255, 107, 0, 0.1)",
+    justifyContent: "center",
+    alignItems: "center",
   },
   
   // Expanded Content

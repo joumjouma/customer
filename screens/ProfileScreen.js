@@ -24,6 +24,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import ProfilePicture from '../components/ProfilePicture';
 import { uploadImage, generateImagePath } from '../utils/storage';
+import { useAuth } from '../context/AuthContext';
 
 // Create ThemeContext
 const ThemeContext = React.createContext();
@@ -87,6 +88,7 @@ function Profile() {
   const [userActivities, setUserActivities] = useState([]);
   const navigation = useNavigation();
   const { isDarkMode, toggleTheme } = useTheme();
+  const { refreshUserData } = useAuth();
 
   // Define theme colors
   const theme = {
@@ -123,13 +125,13 @@ function Profile() {
       
       if (docSnap.exists()) {
         const userData = docSnap.data();
-        console.log("User data from Firestore:", userData);
+        console.log("ProfileScreen - User data from Firestore:", userData);
         setUserDetails({
           ...userData,
           email: user.email,
           firstName: userData.firstName || user.displayName?.split(' ')[0] || "",
           lastName: userData.lastName || user.displayName?.split(' ').slice(1).join(' ') || "",
-          number: userData.number|| user.number || "",
+          number: userData.number || user.number || "",
           photo: userData.photo || user.photoURL || null
         });
       } else {
@@ -152,6 +154,9 @@ function Profile() {
         // Set the user details in state
         setUserDetails(defaultUserData);
       }
+      
+      // Also refresh the auth context user data
+      await refreshUserData();
     } catch (error) {
       console.error("Error fetching user data:", error);
       Alert.alert("Error", "Failed to load user data. Please try again.");
@@ -160,6 +165,12 @@ function Profile() {
     }
   };
 
+  // Initial data fetch
+  useEffect(() => {
+    fetchUserData();
+  }, []);
+
+  // Listen for screen focus to refresh data
   useEffect(() => {
     const unsubscribe = navigation.addListener('focus', () => {
       fetchUserData();
@@ -216,6 +227,9 @@ function Profile() {
           ...prev,
           photo: downloadURL
         }));
+
+        // Also refresh the auth context
+        await refreshUserData();
 
         Alert.alert('Success', 'Profile picture updated successfully');
       }
@@ -360,7 +374,7 @@ function Profile() {
 
           <TouchableOpacity
             style={[styles.serviceCard, { backgroundColor: theme.serviceCardBackground }]}
-            onPress={() => navigation.navigate("ActivityScreen")}
+            onPress={() => navigation.navigate("Activity")}
           >
             <View style={styles.serviceIconContainer}>
               <Ionicons name="time" size={24} color={theme.serviceIcon} />

@@ -29,6 +29,7 @@ import { auth, firestore } from "../firebase.config";
 import CavalLogo from "../assets/Caval_Logo-removebg-preview.png";
 import CustomPin from "../assets/CustomPin.png";
 import { useNavigation, useRoute } from "@react-navigation/native";
+import MapViewDirections from 'react-native-maps-directions';
 
 const RECENT_SEARCHES_KEY = "recentSearches";
 const THEME_STORAGE_KEY = "appTheme";
@@ -79,9 +80,10 @@ const HomeScreenWithMap = ({ userName = "User" }) => {
   const [pickupText, setPickupText] = useState("");
   const [showPickupInput, setShowPickupInput] = useState(false);
   const [pickupInputVisible, setPickupInputVisible] = useState(false);
+  const [destination, setDestination] = useState(null);
 
   // Customer info
-  const [customerFirstName, setCustomerFirstName] = useState(userName);
+  const [customerFirstName, setCustomerFirstName] = useState("");
   const [customerPhoto, setCustomerPhoto] = useState(null);
   const [customerPhone, setCustomerPhone] = useState(null);
   const [customerTariff, setCustomerTariff] = useState(null);
@@ -172,24 +174,58 @@ const HomeScreenWithMap = ({ userName = "User" }) => {
           const docSnap = await getDoc(docRef);
           if (docSnap.exists()) {
             const userData = docSnap.data();
-            setCustomerFirstName(userData.firstName || userName);
+            setCustomerFirstName(userData.firstName || userName || "User");
             setCustomerPhoto(userData.photo || null);
             setCustomerPhone(userData.number || null);
             setCustomerTariff(userData.tariff || 9.99);
           } else {
             console.log("No document found in Firestore!");
-            setCustomerFirstName(userName);
+            setCustomerFirstName(userName || "User");
           }
         } catch (error) {
           console.error("Error fetching customer data:", error);
-          setCustomerFirstName(userName);
+          setCustomerFirstName(userName || "User");
         }
       } else {
         console.log("User not logged in");
-        setCustomerFirstName(userName);
+        setCustomerFirstName(userName || "User");
       }
     })();
   }, [userName]);
+
+  // Update customerFirstName when userName prop changes (backup mechanism)
+  useEffect(() => {
+    if (userName && userName !== "User") {
+      setCustomerFirstName(userName);
+    }
+  }, [userName]);
+
+  // Add a listener for when the screen comes into focus to refresh user data
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('focus', () => {
+      // Refresh user data when screen comes into focus
+      (async () => {
+        const currentUser = auth.currentUser;
+        if (currentUser) {
+          try {
+            const docRef = doc(firestore, "Customers", currentUser.uid);
+            const docSnap = await getDoc(docRef);
+            if (docSnap.exists()) {
+              const userData = docSnap.data();
+              setCustomerFirstName(userData.firstName || userName || "User");
+              setCustomerPhoto(userData.photo || null);
+              setCustomerPhone(userData.number || null);
+              setCustomerTariff(userData.tariff || 9.99);
+            }
+          } catch (error) {
+            console.error("Error refreshing customer data:", error);
+          }
+        }
+      })();
+    });
+
+    return unsubscribe;
+  }, [navigation, userName]);
 
   useEffect(() => {
     (async () => {
@@ -318,6 +354,9 @@ const HomeScreenWithMap = ({ userName = "User" }) => {
       const location = details.geometry.location;
       const destinationCoords = { latitude: location.lat, longitude: location.lng };
       
+      // Set the destination state for the map
+      setDestination(destinationCoords);
+      
       // Safely update recentSearches
       setRecentSearches((prev) => {
         const prevSearches = Array.isArray(prev) ? prev : [];
@@ -363,6 +402,9 @@ const HomeScreenWithMap = ({ userName = "User" }) => {
       if (data.status === "OK" && data.results && data.results.length > 0) {
         const location = data.results[0].geometry.location;
         const destinationCoords = { latitude: location.lat, longitude: location.lng };
+        
+        // Set the destination state for the map
+        setDestination(destinationCoords);
         
         // Safely update recentSearches
         setRecentSearches((prev) => {
@@ -580,6 +622,10 @@ const HomeScreenWithMap = ({ userName = "User" }) => {
             longitude: coordinate.longitude,
             address: address
           };
+          
+          // Set the destination state for the map
+          setDestination(destinationCoords);
+          
           const originData = {
             latitude: fromLocation.latitude,
             longitude: fromLocation.longitude,
@@ -719,7 +765,7 @@ const HomeScreenWithMap = ({ userName = "User" }) => {
         maxHeight: Platform.OS === 'android' ? '60%' : '50%',
         zIndex: 5,
         position: 'absolute',
-        bottom: keyboardVisible ? keyboardHeight - 50 : Platform.OS === 'android' ? 20 : 0,
+        bottom: keyboardVisible ? (Platform.OS === 'ios' ? 500 : keyboardHeight - 50) : Platform.OS === 'android' ? 20 : 0,
         left: 0,
         right: 0,
       },
@@ -1077,7 +1123,7 @@ const HomeScreenWithMap = ({ userName = "User" }) => {
                 showsCompass={false}
                 rotateEnabled={false}
                 mapPadding={{ 
-                  top: -100, 
+                  top: 100, 
                   right: 0, 
                   bottom: selectionMode ? 0 : Platform.OS === 'ios' ? 350 : 100, 
                   left: 0 
@@ -1114,10 +1160,10 @@ const HomeScreenWithMap = ({ userName = "User" }) => {
                     </View>
                   </Marker>
                 )}
-                {/* Show the dropoff marker if we're in dropoff selection mode and a location is selected */}
-                {(selectionMode === 'dropoff' && selectedLocation) && (
-                  <Marker coordinate={selectedLocation} title="Arrivée" anchor={{ x: 0.5, y: 0.5 }}>
-                    <View style={{ 
+                {/* Show destination marker when destination is selected */}
+                {destination && (
+                  <Marker coordinate={destination} title="Destination" anchor={{ x: 0.5, y: 0.5 }}>
+                    <View style={{
                       width: 32,
                       height: 32,
                       backgroundColor: '#4CAF50',
@@ -1132,13 +1178,30 @@ const HomeScreenWithMap = ({ userName = "User" }) => {
                       shadowRadius: 4,
                       elevation: 5,
                     }}>
-                      <Ionicons 
-                        name="flag" 
-                        size={16} 
-                        color="#fff" 
-                      />
+                      <Ionicons name="flag" size={16} color="#fff" />
                     </View>
                   </Marker>
+                )}
+                {/* Draw the route and center it in the visible area */}
+                {(fromLocation && destination && !selectionMode) && (
+                  <MapViewDirections
+                    origin={fromLocation}
+                    destination={destination}
+                    apikey={GOOGLE_API_KEY}
+                    strokeWidth={4}
+                    strokeColor="#FF6F00"
+                    onReady={result => {
+                      mapRef.current?.fitToCoordinates(result.coordinates, {
+                        edgePadding: {
+                          top: 60, // Height of the gap at the top
+                          right: 40,
+                          bottom: Platform.OS === 'ios' ? 350 : 320, // Height of the bottom card
+                          left: 40,
+                        },
+                        animated: true,
+                      });
+                    }}
+                  />
                 )}
               </MapView>
               {/* Fixed pin overlay in the center when in selection mode */}
@@ -1237,20 +1300,20 @@ const HomeScreenWithMap = ({ userName = "User" }) => {
             {/* Selection mode bottom sheet */}
             {selectionMode && (
               <View style={styles.selectionBottomSheet}>
-                <Text style={styles.selectionTitle}>Set your destination</Text>
-                <Text style={styles.selectionSubtitle}>Drag map to move pin</Text>
+                <Text style={styles.selectionTitle}>Définissez votre destination</Text>
+                <Text style={styles.selectionSubtitle}>Faites glisser la carte pour déplacer l'épingle</Text>
                 <View style={styles.selectionSearchBar}>
                   <Ionicons name="location-outline" size={20} color="#FF6F00" style={{ marginLeft: 8 }} />
-                  <Text style={styles.selectionSearchText}>{searchText || 'Search for a place'}</Text>
+                  <Text style={styles.selectionSearchText}>{searchText || 'Rechercher un lieu'}</Text>
                   <TouchableOpacity style={{ marginRight: 8 }}>
                     <Ionicons name="search" size={20} color="#FF6F00" />
                   </TouchableOpacity>
                 </View>
                 <TouchableOpacity style={styles.selectionConfirmButton} onPress={() => handleMapPress({ nativeEvent: { coordinate: region } })}>
-                  <Text style={styles.selectionConfirmButtonText}>Confirm destination</Text>
+                  <Text style={styles.selectionConfirmButtonText}>Confirmer la destination</Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.selectionCancelButton} onPress={handleCancelSelection}>
-                  <Text style={styles.selectionCancelButtonText}>Cancel</Text>
+                  <Text style={styles.selectionCancelButtonText}>Annuler</Text>
                 </TouchableOpacity>
               </View>
             )}
@@ -1299,7 +1362,7 @@ const HomeScreenWithMap = ({ userName = "User" }) => {
               styles.bottomContainer,
               {
                 position: 'absolute',
-                bottom: keyboardVisible ? keyboardHeight - 50 : Platform.OS === 'android' ? 20 : 0,
+                bottom: keyboardVisible ? (Platform.OS === 'ios' ? 1 : keyboardHeight - 50) : Platform.OS === 'android' ? 20 : 0,
                 left: 0,
                 right: 0,
                 opacity: fadeAnim,
@@ -1400,6 +1463,25 @@ const HomeScreenWithMap = ({ userName = "User" }) => {
                           zIndex: 9999,
                         }
                       }}
+                      enablePoweredByContainer={false}
+                      minLength={2}
+                      timeout={10000}
+                      onFail={(error) => {
+                        console.log('GooglePlacesAutocomplete Error:', error);
+                        setPickupText('');
+                      }}
+                      onNotFound={() => {
+                        console.log('No results found');
+                        setPickupText('');
+                      }}
+                      enableHighAccuracyLocation={true}
+                      returnKeyType={'search'}
+                      textInputHide={false}
+                      nearbyPlacesAPI="GooglePlacesSearch"
+                      GooglePlacesDetailsQuery={{
+                        fields: "geometry,formatted_address"
+                      }}
+                      filterReverseGeocodingByTypes={['locality', 'administrative_area_level_3']}
                     />
                     <TouchableOpacity style={styles.cancelButton} onPress={() => { setShowPickupInput(false); setPickupInputVisible(false); }}>
                       <Text style={styles.cancelButtonText}>Annuler</Text>

@@ -16,7 +16,6 @@ import {
 import {
   createUserWithEmailAndPassword,
   signInWithCredential,
-  GoogleAuthProvider,
   PhoneAuthProvider,
 } from "firebase/auth";
 import { auth, firestore } from "../firebase.config";
@@ -24,13 +23,8 @@ import { setDoc, doc, serverTimestamp } from "firebase/firestore";
 import { useNavigation } from "@react-navigation/native";
 import CavalLogo from "../assets/Caval_Logo-removebg-preview.png";
 import { LinearGradient } from "expo-linear-gradient";
-import * as Google from "expo-auth-session/providers/google";
-import * as WebBrowser from "expo-web-browser";
-import { Ionicons, FontAwesome } from "@expo/vector-icons";
+import { Ionicons } from "@expo/vector-icons";
 import CustomPhoneInput from "./CustomPhoneInput";
-
-// Register for Web Browser redirect
-WebBrowser.maybeCompleteAuthSession();
 
 function RegisterScreen() {
   // Basic user fields
@@ -50,61 +44,6 @@ function RegisterScreen() {
   const phoneInput = useRef(null);
 
   const navigation = useNavigation();
-
-  // Google Sign in configuration
-  const [request, response, promptAsync] = Google.useIdTokenAuthRequest({
-    expoClientId: "YOUR_EXPO_CLIENT_ID",
-    clientId: "YOUR_WEB_CLIENT_ID",
-    iosClientId: "YOUR_IOS_CLIENT_ID",
-    androidClientId: "YOUR_ANDROID_CLIENT_ID",
-    scopes: ['profile', 'email'],
-  });
-
-  // Handle Google Sign In
-  React.useEffect(() => {
-    if (response?.type === "success") {
-      const { id_token } = response.params;
-      const credential = GoogleAuthProvider.credential(id_token);
-      signInWithGoogle(credential);
-    } else if (response?.type === "error") {
-      console.error("Google Auth Error:", response.error);
-      Alert.alert(
-        "Google Sign In Error",
-        "There was an error signing in with Google. Please check that you have correctly configured your Google client IDs in the app and Google Cloud Console."
-      );
-    }
-  }, [response]);
-
-  const signInWithGoogle = async (credential) => {
-    try {
-      setLoading(true);
-      const userCredential = await signInWithCredential(auth, credential);
-      const user = userCredential.user;
-
-      await setDoc(
-        doc(firestore, "Customers", user.uid),
-        {
-          email: user.email,
-          firstName: user.displayName ? user.displayName.split(" ")[0] : "",
-          lastName: user.displayName
-            ? user.displayName.split(" ").slice(1).join(" ")
-            : "",
-          number: user.phoneNumber || "",
-          createdAt: new Date(),
-          authProvider: "google",
-        },
-        { merge: true }
-      );
-      
-      Alert.alert("Succès", "Connecté avec Google avec succès !");
-      navigation.navigate("HomeTabs");
-    } catch (error) {
-      console.error(error);
-      Alert.alert("Erreur", error.message);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const sendVerificationCode = async () => {
     try {
@@ -231,24 +170,6 @@ function RegisterScreen() {
             <Text style={styles.subtitle}>
               Rejoignez Caval et commencez votre aventure avec nous
             </Text>
-          </View>
-
-          {/* Social Sign-in Section */}
-          <View style={styles.socialContainer}>
-            <TouchableOpacity
-              style={styles.googleButton}
-              onPress={() => promptAsync()}
-              disabled={loading}
-            >
-              <FontAwesome name="google" size={20} color="#EA4335" />
-              <Text style={styles.googleButtonText}>S'inscrire avec Google</Text>
-            </TouchableOpacity>
-          </View>
-
-          <View style={styles.dividerContainer}>
-            <View style={styles.divider} />
-            <Text style={styles.dividerText}>ou s'inscrire avec</Text>
-            <View style={styles.divider} />
           </View>
 
           {/* Registration Method Toggle */}
@@ -513,48 +434,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: "#bbb",
     textAlign: "center",
-  },
-  socialContainer: {
-    width: "100%",
-    marginBottom: 25,
-  },
-  googleButton: {
-    flexDirection: "row",
-    backgroundColor: "#333",
-    paddingVertical: 16,
-    borderRadius: 12,
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 10,
-    borderWidth: 1,
-    borderColor: "#444",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.3,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  googleButtonText: {
-    color: "#fff",
-    marginLeft: 10,
-    fontSize: 16,
-    fontWeight: "600",
-  },
-  dividerContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 25,
-    width: "100%",
-  },
-  divider: {
-    flex: 1,
-    height: 1,
-    backgroundColor: "#444",
-  },
-  dividerText: {
-    marginHorizontal: 10,
-    color: "#bbb",
-    fontSize: 14,
   },
   formContainer: {
     width: "100%",

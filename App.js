@@ -25,6 +25,7 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import 'react-native-get-random-values';
 
 // Import Screens
+import SplashScreen from "./screens/SplashScreen";
 import LoginScreen from "./screens/LoginScreen";
 import RegisterScreen from "./screens/RegisterScreen";
 import HomeScreenWithMap from "./screens/HomeScreenWithMap";
@@ -51,7 +52,12 @@ LogBox.ignoreLogs(['Warning: ...']); // Ignore non-critical warnings
 // Bottom Tab Navigator (Home, Activity, Profile)
 function HomeTabs() {
   const { user } = useAuth();
-  const userName = user?.displayName || "User";
+  const userName = user?.firstName || user?.displayName || "User";
+  
+  console.log('App.js - User from auth context:', user);
+  console.log('App.js - userName being passed to HomeScreenWithMap:', userName);
+  console.log('App.js - user.firstName:', user?.firstName);
+  console.log('App.js - user.displayName:', user?.displayName);
   
   return (
     <Tab.Navigator
@@ -148,18 +154,29 @@ const AppContent = () => {
   
   if (loading) {
     return (
-      <View style={styles.container}>
+      <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#ff9f43" />
       </View>
     );
   }
 
   return (
-    <NavigationContainer>
+    <NavigationContainer
+      theme={{
+        colors: {
+          background: '#121212',
+          card: '#1e1e1e',
+          text: '#ffffff',
+          border: '#333333',
+          primary: '#ff9f43',
+        },
+        dark: true,
+      }}
+    >
       <Stack.Navigator
         screenOptions={{
           headerShown: false,
-          cardStyle: { backgroundColor: '#1e1e1e' },
+          cardStyle: { backgroundColor: '#121212' },
           animationEnabled: false
         }}
         initialRouteName={user ? "HomeTabs" : "LoginScreen"}
@@ -229,17 +246,39 @@ const AppContent = () => {
 };
 
 export default function App() {
+  const [showSplash, setShowSplash] = useState(true);
+
+  const handleSplashFinish = () => {
+    setShowSplash(false);
+  };
+
+  if (showSplash) {
+    return <SplashScreen onFinish={handleSplashFinish} />;
+  }
+
   return (
-    <StripeProvider publishableKey="pk_live_51R9ek8CmEzIPQVTO8V3wcapg87N24eNFOCaJ4dz2krvfKSBaNe5g0vYAW4XBHESTYpQBi6fdz7GA4fPGJh4BlGIW00L1KYPz6m">
-      <AuthProvider>
-        <AppContent />
-      </AuthProvider>
-    </StripeProvider>
+    <View style={styles.appContainer}>
+      <StripeProvider publishableKey="pk_live_51R9ek8CmEzIPQVTO8V3wcapg87N24eNFOCaJ4dz2krvfKSBaNe5g0vYAW4XBHESTYpQBi6fdz7GA4fPGJh4BlGIW00L1KYPz6m">
+        <AuthProvider>
+          <AppContent />
+        </AuthProvider>
+      </StripeProvider>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  appContainer: {
+    flex: 1,
+    backgroundColor: "#121212",
+  },
   container: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#1e1e1e",
+  },
+  loadingContainer: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",

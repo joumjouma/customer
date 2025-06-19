@@ -27,7 +27,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { auth, firestore } from "../firebase.config";
 import { LinearGradient } from "expo-linear-gradient";
 import CustomPhoneInput from "./CustomPhoneInput";
-import { FirebaseRecaptchaVerifierModal } from 'expo-firebase-recaptcha';
+// import { FirebaseRecaptchaVerifierModal } from 'expo-firebase-recaptcha';
 import { firebaseConfig } from '../firebase.config';
 
 function LoginScreen() {
@@ -45,7 +45,7 @@ function LoginScreen() {
   const [error, setError] = useState('');
   const [showVerification, setShowVerification] = useState(false);
   const phoneInput = useRef(null);
-  const recaptchaVerifier = useRef(null);
+  // const recaptchaVerifier = useRef(null);
 
   // Set up reCAPTCHA verifier
   useEffect(() => {
@@ -221,7 +221,10 @@ function LoginScreen() {
         verId = await phoneProvider.verifyPhoneNumber(formattedPhone, window.recaptchaVerifier);
       } else {
         // For mobile platforms, use expo-firebase-recaptcha
-        verId = await phoneProvider.verifyPhoneNumber(formattedPhone, recaptchaVerifier.current);
+        // verId = await phoneProvider.verifyPhoneNumber(formattedPhone, recaptchaVerifier.current);
+        setError('Phone authentication temporarily disabled. Please use email login.');
+        setLoading(false);
+        return;
       }
       
       setVerificationId(verId);
@@ -418,10 +421,10 @@ function LoginScreen() {
         <Ionicons name={isDarkMode ? "sunny" : "moon"} size={24} color="#fff" />
       </TouchableOpacity>
 
-      <FirebaseRecaptchaVerifierModal
+      {/* <FirebaseRecaptchaVerifierModal
         ref={recaptchaVerifier}
         firebaseConfig={firebaseConfig}
-      />
+      /> */}
 
       <ScrollView contentContainerStyle={styles.scrollContainer}>
         <Image 

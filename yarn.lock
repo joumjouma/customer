@@ -992,32 +992,6 @@
     xcode "^3.0.1"
     xml2js "0.6.0"
 
-"@expo/config-plugins@~5.0.3":
-  version "5.0.4"
-  resolved "https://registry.npmjs.org/@expo/config-plugins/-/config-plugins-5.0.4.tgz"
-  integrity sha512-vzUcVpqOMs3h+hyRdhGwk+eGIOhXa5xYdd92yO17RMNHav3v/+ekMbs7XA2c3lepMO8Yd4/5hqmRw9ZTL6jGzg==
-  dependencies:
-    "@expo/config-types" "^47.0.0"
-    "@expo/json-file" "8.2.36"
-    "@expo/plist" "0.0.18"
-    "@expo/sdk-runtime-versions" "^1.0.0"
-    "@react-native/normalize-color" "^2.0.0"
-    chalk "^4.1.2"
-    debug "^4.3.1"
-    find-up "~5.0.0"
-    getenv "^1.0.0"
-    glob "7.1.6"
-    resolve-from "^5.0.0"
-    semver "^7.3.5"
-    slash "^3.0.0"
-    xcode "^3.0.1"
-    xml2js "0.4.23"
-
-"@expo/config-types@^47.0.0":
-  version "47.0.0"
-  resolved "https://registry.npmjs.org/@expo/config-types/-/config-types-47.0.0.tgz"
-  integrity sha512-r0pWfuhkv7KIcXMUiNACJmJKKwlTBGMw9VZHNdppS8/0Nve8HZMTkNRFQzTHW1uH3pBj8jEXpyw/2vSWDHex9g==
-
 "@expo/config-types@^53.0.3", "@expo/config-types@^53.0.4":
   version "53.0.4"
   resolved "https://registry.npmjs.org/@expo/config-types/-/config-types-53.0.4.tgz"
@@ -1041,23 +1015,6 @@
     semver "^7.6.0"
     slugify "^1.3.4"
     sucrase "3.35.0"
-
-"@expo/config@~7.0.2":
-  version "7.0.3"
-  resolved "https://registry.npmjs.org/@expo/config/-/config-7.0.3.tgz"
-  integrity sha512-joVtB5o+NF40Tmsdp65UzryRtbnCuMbXkVO4wJnNJO4aaK0EYLdHCYSewORVqNcDfGN0LphQr8VTG2npbd9CJA==
-  dependencies:
-    "@babel/code-frame" "~7.10.4"
-    "@expo/config-plugins" "~5.0.3"
-    "@expo/config-types" "^47.0.0"
-    "@expo/json-file" "8.2.36"
-    getenv "^1.0.0"
-    glob "7.1.6"
-    require-from-string "^2.0.2"
-    resolve-from "^5.0.0"
-    semver "7.3.2"
-    slugify "^1.3.4"
-    sucrase "^3.20.0"
 
 "@expo/devcert@^1.1.2":
   version "1.2.0"
@@ -1118,15 +1075,6 @@
     "@babel/code-frame" "~7.10.4"
     json5 "^2.2.3"
 
-"@expo/json-file@8.2.36":
-  version "8.2.36"
-  resolved "https://registry.npmjs.org/@expo/json-file/-/json-file-8.2.36.tgz"
-  integrity sha512-tOZfTiIFA5KmMpdW9KF7bc6CFiGjb0xnbieJhTGlHrLL+ps2G0OkqmuZ3pFEXBOMnJYUVpnSy++52LFxvpa5ZQ==
-  dependencies:
-    "@babel/code-frame" "~7.10.4"
-    json5 "^1.0.1"
-    write-file-atomic "^2.3.0"
-
 "@expo/metro-config@~0.20.0", "@expo/metro-config@~0.20.14", "@expo/metro-config@0.20.14":
   version "0.20.14"
   resolved "https://registry.npmjs.org/@expo/metro-config/-/metro-config-0.20.14.tgz"
@@ -1185,15 +1133,6 @@
     "@xmldom/xmldom" "^0.8.8"
     base64-js "^1.2.3"
     xmlbuilder "^15.1.1"
-
-"@expo/plist@0.0.18":
-  version "0.0.18"
-  resolved "https://registry.npmjs.org/@expo/plist/-/plist-0.0.18.tgz"
-  integrity sha512-+48gRqUiz65R21CZ/IXa7RNBXgAI/uPSdvJqoN9x1hfL44DNbUoWHgHiEXTx7XelcATpDwNTz6sHLfy0iNqf+w==
-  dependencies:
-    "@xmldom/xmldom" "~0.7.0"
-    base64-js "^1.2.3"
-    xmlbuilder "^14.0.0"
 
 "@expo/prebuild-config@^9.0.6":
   version "9.0.6"
@@ -2215,11 +2154,6 @@
   resolved "https://registry.npmjs.org/@react-native/js-polyfills/-/js-polyfills-0.79.2.tgz"
   integrity sha512-IaY87Ckd4GTPMkO1/Fe8fC1IgIx3vc3q9Tyt/6qS3Mtk9nC0x9q4kSR5t+HHq0/MuvGtu8HpdxXGy5wLaM+zUw==
 
-"@react-native/normalize-color@^2.0.0":
-  version "2.1.0"
-  resolved "https://registry.npmjs.org/@react-native/normalize-color/-/normalize-color-2.1.0.tgz"
-  integrity sha512-Z1jQI2NpdFJCVgpY+8Dq/Bt3d+YUi1928Q+/CZm/oh66fzM0RUl54vvuXlPJKybH4pdCZey1eDTPaLHkMPNgWA==
-
 "@react-native/normalize-colors@0.79.2":
   version "0.79.2"
   resolved "https://registry.npmjs.org/@react-native/normalize-colors/-/normalize-colors-0.79.2.tgz"
@@ -2517,11 +2451,6 @@
   version "0.8.10"
   resolved "https://registry.npmjs.org/@xmldom/xmldom/-/xmldom-0.8.10.tgz"
   integrity sha512-2WALfTl4xo2SkGCYRt6rDTFfk9R1czmBvUQy12gK2KuRKIpWEhcbbzy8EZXtz/jkRqHX8bFEc6FC1HjX4TUWYw==
-
-"@xmldom/xmldom@~0.7.0":
-  version "0.7.13"
-  resolved "https://registry.npmjs.org/@xmldom/xmldom/-/xmldom-0.7.13.tgz"
-  integrity sha512-lm2GW5PkosIzccsaZIz7tp8cPADSIlIHWDFTR1N0SzfinhhYgeIQjFMz4rYzanCScr3DqQLeomUDArp6MWKm+g==
 
 abort-controller@^3.0.0:
   version "3.0.0"
@@ -4113,14 +4042,6 @@ expo-camera@~16.1.6:
   dependencies:
     invariant "^2.2.4"
 
-expo-constants@~14.0.0:
-  version "14.0.2"
-  resolved "https://registry.npmjs.org/expo-constants/-/expo-constants-14.0.2.tgz"
-  integrity sha512-wzV3nrzTXTI8yG0tfas3fnqCfKV6YE+1GphEREyVDAShEB6mBInX1b6HgtpHFy2wOtnml+lPVmTCeGtjjLnZhA==
-  dependencies:
-    "@expo/config" "~7.0.2"
-    uuid "^3.3.2"
-
 expo-constants@~17.1.4, expo-constants@~17.1.5, expo-constants@~17.1.6:
   version "17.1.6"
   resolved "https://registry.npmjs.org/expo-constants/-/expo-constants-17.1.6.tgz"
@@ -4173,20 +4094,6 @@ expo-file-system@~18.1.10:
   version "18.1.10"
   resolved "https://registry.npmjs.org/expo-file-system/-/expo-file-system-18.1.10.tgz"
   integrity sha512-SyaWg+HitScLuyEeSG9gMSDT0hIxbM9jiZjSBP9l9zMnwZjmQwsusE6+7qGiddxJzdOhTP4YGUfvEzeeS0YL3Q==
-
-expo-firebase-core@~6.0.0:
-  version "6.0.0"
-  resolved "https://registry.npmjs.org/expo-firebase-core/-/expo-firebase-core-6.0.0.tgz"
-  integrity sha512-ZMcvRxKuAjZ0V4+VCuYKQ9P3Br8nGUORCbG41ewyLnLXBwov85AdBx4/5lA7T5cX1oOmv2fKMnU3gqCR+s6Veg==
-  dependencies:
-    expo-constants "~14.0.0"
-
-expo-firebase-recaptcha@^2.3.1:
-  version "2.3.1"
-  resolved "https://registry.npmjs.org/expo-firebase-recaptcha/-/expo-firebase-recaptcha-2.3.1.tgz"
-  integrity sha512-1v2hUytjq26CVSa4uhBt8xoAfZ8ryHCEjjJSdqzAs0gtpwnSrGHPKZcqll4aZUinZ0HVSW8/ZvEmToAF6zysCw==
-  dependencies:
-    expo-firebase-core "~6.0.0"
 
 expo-font@*, expo-font@^13.3.1, expo-font@~13.3.1:
   version "13.3.1"
@@ -4441,7 +4348,7 @@ find-up@^4.1.0:
     locate-path "^5.0.0"
     path-exists "^4.0.0"
 
-find-up@^5.0.0, find-up@~5.0.0:
+find-up@^5.0.0:
   version "5.0.0"
   resolved "https://registry.npmjs.org/find-up/-/find-up-5.0.0.tgz"
   integrity sha512-78/PXT1wlLLDgTzDs7sjq9hzz0vXD+zn+7wypEe4fXQxCmdmqfGsEPQxmiCSQI3ajFV91bVSsvNtrJRiW6nGng==
@@ -4704,18 +4611,6 @@ glob@^9.3.3:
     minipass "^4.2.4"
     path-scurry "^1.6.1"
 
-glob@7.1.6:
-  version "7.1.6"
-  resolved "https://registry.npmjs.org/glob/-/glob-7.1.6.tgz"
-  integrity sha512-LwaxwyZ72Lk7vZINtNNrywX0ZuLyStrdDtabefZKAY5ZGJhVtgdznluResxNmPitE0SAO+O26sWTHeKSI2wMBA==
-  dependencies:
-    fs.realpath "^1.0.0"
-    inflight "^1.0.4"
-    inherits "2"
-    minimatch "^3.0.4"
-    once "^1.3.0"
-    path-is-absolute "^1.0.0"
-
 globals@^11.1.0:
   version "11.12.0"
   resolved "https://registry.npmjs.org/globals/-/globals-11.12.0.tgz"
@@ -4731,7 +4626,7 @@ gopd@^1.2.0:
   resolved "https://registry.npmjs.org/gopd/-/gopd-1.2.0.tgz"
   integrity sha512-ZUKRh6/kUFoAiTAtTYPZJ3hw9wNxx+BIBOijnlG9PnrJsCcSjs1wyyD6vJpaYtgnzDrKYRSqf3OO6Rfa93xsRg==
 
-graceful-fs@^4.1.11, graceful-fs@^4.1.3, graceful-fs@^4.1.6, graceful-fs@^4.2.0, graceful-fs@^4.2.4, graceful-fs@^4.2.9:
+graceful-fs@^4.1.3, graceful-fs@^4.1.6, graceful-fs@^4.2.0, graceful-fs@^4.2.4, graceful-fs@^4.2.9:
   version "4.2.11"
   resolved "https://registry.npmjs.org/graceful-fs/-/graceful-fs-4.2.11.tgz"
   integrity sha512-RbJ5/jmFcNNCcDV5o9eTnBLJ/HszWV0P73bc+Ff4nS/rJj+YaS6IGyiOL0VoBYX+l1Wrl3k63h/KrH+nhJ0XvQ==
@@ -5332,13 +5227,6 @@ json-schema-traverse@^1.0.0:
   version "1.0.0"
   resolved "https://registry.npmjs.org/json-schema-traverse/-/json-schema-traverse-1.0.0.tgz"
   integrity sha512-NM8/P9n3XjXhIZn1lLhkFaACTOURQXjWhV4BA/RnOv8xvgqtqpAX9IO4mRQxSx1Rlo4tqzeqb0sOlruaOy3dug==
-
-json5@^1.0.1:
-  version "1.0.2"
-  resolved "https://registry.npmjs.org/json5/-/json5-1.0.2.tgz"
-  integrity sha512-g1MWMLBiz8FKi1e4w0UyVL3w+iJceWAFBAaBnnGKOpNa5f8TLktkbre1+s6oICydWAm+HRUGTmI+//xv2hvXYA==
-  dependencies:
-    minimist "^1.2.0"
 
 json5@^2.2.3:
   version "2.2.3"
@@ -7469,11 +7357,6 @@ semver@^7.1.3, semver@^7.3.5, semver@^7.5.2, semver@^7.5.4, semver@^7.6.0:
   resolved "https://registry.npmjs.org/semver/-/semver-7.7.1.tgz"
   integrity sha512-hlq8tAfn0m/61p4BVRcPzIGr6LKiMwo4VM6dGi6pt4qcRkmNzTcWq6eCEjEh+qXjkMDvPlOFFSGwQjoEa6gyMA==
 
-semver@7.3.2:
-  version "7.3.2"
-  resolved "https://registry.npmjs.org/semver/-/semver-7.3.2.tgz"
-  integrity sha512-OrOb32TeeambH6UrhtShmF7CRDqhL6/5XpPNp2DuRH6+9QLw/orhp72j87v8Qa1ScDkvrrBNpZcDejAirJmfXQ==
-
 send@^0.19.0:
   version "0.19.1"
   resolved "https://registry.npmjs.org/send/-/send-0.19.1.tgz"
@@ -7836,7 +7719,7 @@ structured-headers@^0.4.1:
   resolved "https://registry.npmjs.org/structured-headers/-/structured-headers-0.4.1.tgz"
   integrity sha512-0MP/Cxx5SzeeZ10p/bZI0S6MpgD+yxAhi1BOQ34jgnMXsCq3j1t6tQnZu+KdlL7dvJTLT3g9xN8tl10TqgFMcg==
 
-sucrase@^3.20.0, sucrase@^3.35.0, sucrase@3.35.0:
+sucrase@^3.35.0, sucrase@3.35.0:
   version "3.35.0"
   resolved "https://registry.npmjs.org/sucrase/-/sucrase-3.35.0.tgz"
   integrity sha512-8EbVDiu9iN/nESwxeSxDKe0dunta1GOlHufmSSXxMD2z2/tMZpDMpvXQGsc+ajGo8y2uYUmixaSRUc/QPoQ0GA==
@@ -8193,11 +8076,6 @@ uuid@^11.0.3:
   resolved "https://registry.npmjs.org/uuid/-/uuid-11.1.0.tgz"
   integrity sha512-0/A9rDy9P7cJ+8w1c9WD9V//9Wj15Ce2MPz8Ri6032usz+NfePxx5AcN3bN+r6ZL6jEo066/yNYB3tn4pQEx+A==
 
-uuid@^3.3.2:
-  version "3.4.0"
-  resolved "https://registry.npmjs.org/uuid/-/uuid-3.4.0.tgz"
-  integrity sha512-HjSDRw6gZE5JMggctHBcjVak08+KEVhSIiDzFnT9S9aegmp85S/bReBVTb4QTFaRNptJ9kuYaNhnbNEOkbKb/A==
-
 uuid@^7.0.3:
   version "7.0.3"
   resolved "https://registry.npmjs.org/uuid/-/uuid-7.0.3.tgz"
@@ -8345,15 +8223,6 @@ wrappy@1:
   resolved "https://registry.npmjs.org/wrappy/-/wrappy-1.0.2.tgz"
   integrity sha512-l4Sp/DRseor9wL6EvV2+TuQn63dMkPjZ/sp9XkghTEbV9KlPS1xUsZ3u7/IQO4wxtcFB4bgpQPRcR3QCvezPcQ==
 
-write-file-atomic@^2.3.0:
-  version "2.4.3"
-  resolved "https://registry.npmjs.org/write-file-atomic/-/write-file-atomic-2.4.3.tgz"
-  integrity sha512-GaETH5wwsX+GcnzhPgKcKjJ6M2Cq3/iZp1WyY/X1CSqrW+jVNM9Y7D8EC2sM4ZG/V8wZlSniJnCKWPmBYAucRQ==
-  dependencies:
-    graceful-fs "^4.1.11"
-    imurmurhash "^0.1.4"
-    signal-exit "^3.0.2"
-
 write-file-atomic@^4.0.2:
   version "4.0.2"
   resolved "https://registry.npmjs.org/write-file-atomic/-/write-file-atomic-4.0.2.tgz"
@@ -8399,14 +8268,6 @@ xcode@^3.0.1:
     simple-plist "^1.1.0"
     uuid "^7.0.3"
 
-xml2js@0.4.23:
-  version "0.4.23"
-  resolved "https://registry.npmjs.org/xml2js/-/xml2js-0.4.23.tgz"
-  integrity sha512-ySPiMjM0+pLDftHgXY4By0uswI3SPKLDw/i3UXbnO8M/p28zqexCUoPmQFrYD+/1BzhGJSs2i1ERWKJAtiLrug==
-  dependencies:
-    sax ">=0.6.0"
-    xmlbuilder "~11.0.0"
-
 xml2js@0.6.0:
   version "0.6.0"
   resolved "https://registry.npmjs.org/xml2js/-/xml2js-0.6.0.tgz"
@@ -8414,11 +8275,6 @@ xml2js@0.6.0:
   dependencies:
     sax ">=0.6.0"
     xmlbuilder "~11.0.0"
-
-xmlbuilder@^14.0.0:
-  version "14.0.0"
-  resolved "https://registry.npmjs.org/xmlbuilder/-/xmlbuilder-14.0.0.tgz"
-  integrity sha512-ts+B2rSe4fIckR6iquDjsKbQFK2NlUk6iG5nf14mDEyldgoc2nEKZ3jZWMPTxGQwVgToSjt6VGIho1H8/fNFTg==
 
 xmlbuilder@^15.1.1:
   version "15.1.1"

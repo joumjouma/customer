@@ -29,6 +29,23 @@
         }
       }
     },
+    "firebase-fix": {
+      "distribution": "internal",
+      "ios": {
+        "simulator": false,
+        "buildConfiguration": "Release"
+      },
+      "android": {
+        "buildType": "apk",
+        "gradleCommand": ":app:assembleRelease",
+        "env": {
+          "EXPO_NO_TEMP_DIR": "1",
+          "EXPO_DEBUG": "true",
+          "NODE_OPTIONS": "--max_old_space_size=4096",
+          "GRADLE_OPTS": "-Dorg.gradle.jvmargs=-Xmx4096m -XX:MaxPermSize=512m -XX:+HeapDumpOnOutOfMemoryError -Dfile.encoding=UTF-8"
+        }
+      }
+    },
     "production": {
       "ios": {
         "buildConfiguration": "Release"

@@ -16,7 +16,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import Ionicons from "react-native-vector-icons/Ionicons";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "./firebase.config";
-import { StripeProvider } from '@stripe/stripe-react-native';
+// import { StripeProvider } from '@stripe/stripe-react-native';
 import { getAuth, signInWithCustomToken, signInWithEmailAndPassword } from "firebase/auth"; // Firebase Auth
 import firebase from './firebase.config';
 import { AuthProvider, useAuth } from './context/AuthContext';
@@ -258,11 +258,9 @@ export default function App() {
 
   return (
     <View style={styles.appContainer}>
-      <StripeProvider publishableKey="pk_live_51R9ek8CmEzIPQVTO8V3wcapg87N24eNFOCaJ4dz2krvfKSBaNe5g0vYAW4XBHESTYpQBi6fdz7GA4fPGJh4BlGIW00L1KYPz6m">
-        <AuthProvider>
-          <AppContent />
-        </AuthProvider>
-      </StripeProvider>
+      <AuthProvider>
+        <AppContent />
+      </AuthProvider>
     </View>
   );
 }

@@ -12,7 +12,7 @@ import {
   ScrollView,
   Platform,
 } from 'react-native';
-import { CardField, useStripe } from '@stripe/stripe-react-native';
+// import { CardField, useStripe } from '@stripe/stripe-react-native';
 import { Ionicons, MaterialCommunityIcons, FontAwesome } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import {
@@ -30,7 +30,7 @@ import { getAuth } from 'firebase/auth';
 
 const PaymentMethodsScreen = () => {
   const navigation = useNavigation();
-  const { createPaymentMethod } = useStripe();
+  // const { createPaymentMethod } = useStripe();
 
   const [paymentMethods, setPaymentMethods] = useState([]);
   const [loading, setLoading] = useState(true);

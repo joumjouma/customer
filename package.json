@@ -23,7 +23,7 @@
     "@react-navigation/native-stack": "^7.3.12",
     "@react-navigation/stack": "^7.0.0",
     "@reduxjs/toolkit": "^2.2.7",
-    "@stripe/stripe-react-native": "^0.46.0",
+    "@stripe/stripe-react-native": "^0.48.0",
     "axios": "^1.7.7",
     "color-convert": "^2.0.1",
     "date-fns": "^4.1.0",

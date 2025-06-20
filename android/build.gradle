@@ -2,11 +2,11 @@
 
 buildscript {
     ext {
-        buildToolsVersion = "33.0.0"
+        buildToolsVersion = "35.0.0"
         minSdkVersion = 21
         compileSdkVersion = 35
-        targetSdkVersion = 33
-        kotlinVersion = "1.7.10"
+        targetSdkVersion = 35
+        kotlinVersion = "1.9.22"
         ndkVersion = "25.1.8937393"
     }
     // Add this near the top of your build.gradle file
@@ -17,7 +17,7 @@ buildscript {
         mavenCentral()
     }
     dependencies {
-        classpath("com.android.tools.build:gradle:7.3.0")
+        classpath("com.android.tools.build:gradle:8.2.2")
         classpath("com.facebook.react:react-native-gradle-plugin")
         classpath("org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlinVersion")
         classpath('com.google.gms:google-services:4.4.0')
@@ -40,4 +40,22 @@ allprojects {
         mavenCentral()
         maven { url 'https://www.jitpack.io' }
     }
+}
+
+// Add repository resolution strategy to redirect jcenter to mavenCentral
+configurations.all {
+    resolutionStrategy {
+        eachDependency { DependencyResolveDetails details ->
+            if (details.requested.group == 'org.jetbrains.kotlin') {
+                details.useVersion kotlinVersion
+            }
+        }
+    }
+}
+
+// Redirect jcenter to mavenCentral for any remaining references
+repositories {
+    mavenCentral()
+    google()
+    maven { url 'https://www.jitpack.io' }
 }

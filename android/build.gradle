@@ -77,3 +77,20 @@ gradle.projectsEvaluated {
         }
     }
 }
+
+// Fix C++ compilation issues
+allprojects {
+    afterEvaluate { project ->
+        if (project.hasProperty('android')) {
+            android {
+                ndkVersion rootProject.ext.ndkVersion
+                
+                defaultConfig {
+                    ndk {
+                        abiFilters "armeabi-v7a", "arm64-v8a", "x86", "x86_64"
+                    }
+                }
+            }
+        }
+    }
+}

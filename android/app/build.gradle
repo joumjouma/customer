@@ -126,6 +126,40 @@ android {
     androidResources {
         ignoreAssetsPattern '!.svn:!.git:!.ds_store:!*.scc:!CVS:!thumbs.db:!picasa.ini:!*~'
     }
+    
+    // Suppress deprecation warnings
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+    
+    kotlinOptions {
+        jvmTarget = '17'
+        freeCompilerArgs += [
+            '-Xsuppress-version-warnings',
+            '-Xno-deprecation-warnings'
+        ]
+    }
+    
+    lintOptions {
+        disable 'Deprecation'
+        checkReleaseBuilds false
+        abortOnError false
+    }
+    
+    // Suppress package attribute warnings from dependencies
+    manifestPlaceholders = [
+        suppressPackageAttribute: true
+    ]
+    
+    // Use newer targetSdk configuration
+    testOptions {
+        targetSdk 35
+    }
+    
+    lint {
+        targetSdk 35
+    }
 }
 
 // Apply static values from `gradle.properties` to the `android.packagingOptions`

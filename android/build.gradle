@@ -1,94 +1,38 @@
 // Top-level build file where you can add configuration options common to all sub-projects/modules.
 
 buildscript {
-    ext {
-        buildToolsVersion = "35.0.0"
-        minSdkVersion = 24
-        compileSdkVersion = 35
-        targetSdkVersion = 35
-        kotlinVersion = "1.9.22"
-        ndkVersion = "21.4.7075529"
-    }
-    // Add this near the top of your build.gradle file
-    def FLIPPER_VERSION = "0.182.0" // Use the latest stable version
-    
-    repositories {
-        google()
-        mavenCentral()
-    }
-    dependencies {
-        classpath("com.android.tools.build:gradle:8.2.2")
-        classpath("com.facebook.react:react-native-gradle-plugin")
-        classpath("org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlinVersion")
-        classpath('com.google.gms:google-services:4.4.0')
-    }
+  repositories {
+    google()
+    mavenCentral()
+  }
+  dependencies {
+        classpath 'com.google.gms:google-services:4.4.1'
+    classpath('com.android.tools.build:gradle')
+    classpath('com.facebook.react:react-native-gradle-plugin')
+    classpath('org.jetbrains.kotlin:kotlin-gradle-plugin')
+  }
 }
 
-apply plugin: "com.facebook.react.rootproject"
+def reactNativeAndroidDir = new File(
+  providers.exec {
+    workingDir(rootDir)
+    commandLine("node", "--print", "require.resolve('react-native/package.json')")
+  }.standardOutput.asText.get().trim(),
+  "../android"
+)
 
 allprojects {
-    repositories {
-        maven {
-            // All of React Native (JS, Obj-C sources, Android binaries) is installed from npm
-            url(new File(['node', '--print', "require.resolve('react-native/package.json')"].execute(null, rootDir).text.trim(), '../android'))
-        }
-        maven {
-            // Android JSC is installed from npm
-            url(new File(['node', '--print', "require.resolve('jsc-android/package.json', { paths: [require.resolve('react-native/package.json')] })"].execute(null, rootDir).text.trim(), '../dist'))
-        }
-        google()
-        mavenCentral()
-        maven { url 'https://www.jitpack.io' }
+  repositories {
+    maven {
+      // All of React Native (JS, Obj-C sources, Android binaries) is installed from npm
+      url(reactNativeAndroidDir)
     }
-}
 
-// Add repository resolution strategy to redirect jcenter to mavenCentral
-configurations.all {
-    resolutionStrategy {
-        eachDependency { DependencyResolveDetails details ->
-            if (details.requested.group == 'org.jetbrains.kotlin') {
-                details.useVersion kotlinVersion
-            }
-        }
-        // Force resolution of conflicting versions
-        force 'org.jetbrains.kotlin:kotlin-stdlib:' + kotlinVersion
-        force 'org.jetbrains.kotlin:kotlin-stdlib-common:' + kotlinVersion
-    }
-}
-
-// Redirect jcenter to mavenCentral for any remaining references
-repositories {
-    mavenCentral()
     google()
+    mavenCentral()
     maven { url 'https://www.jitpack.io' }
+  }
 }
 
-// Suppress deprecation warnings globally
-gradle.projectsEvaluated {
-    tasks.withType(JavaCompile) {
-        options.compilerArgs << "-Xlint:-deprecation"
-    }
-    tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile) {
-        kotlinOptions {
-            freeCompilerArgs += [
-                '-Xsuppress-version-warnings',
-                '-Xno-deprecation-warnings'
-            ]
-        }
-    }
-}
-
-// Configure NDK for all Android projects
-subprojects { subproject ->
-    if (subproject.hasProperty('android')) {
-        subproject.android {
-            ndkVersion "21.4.7075529"
-            
-            defaultConfig {
-                ndk {
-                    abiFilters "armeabi-v7a", "arm64-v8a", "x86", "x86_64"
-                }
-            }
-        }
-    }
-}
+apply plugin: "expo-root-project"
+apply plugin: "com.facebook.react.rootproject" 

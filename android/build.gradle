@@ -7,7 +7,7 @@ buildscript {
         compileSdkVersion = 35
         targetSdkVersion = 35
         kotlinVersion = "1.9.22"
-        ndkVersion = "25.1.8937393"
+        ndkVersion = "21.4.7075529"
     }
     // Add this near the top of your build.gradle file
     def FLIPPER_VERSION = "0.182.0" // Use the latest stable version
@@ -82,7 +82,7 @@ gradle.projectsEvaluated {
 subprojects { subproject ->
     if (subproject.hasProperty('android')) {
         subproject.android {
-            ndkVersion rootProject.ext.ndkVersion
+            ndkVersion "21.4.7075529"
             
             defaultConfig {
                 ndk {

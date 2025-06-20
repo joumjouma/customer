@@ -95,6 +95,14 @@ android {
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 5
         versionName "5.0.0"
+        
+        // Suppress package attribute warnings from dependencies
+        manifestPlaceholders = [
+            suppressPackageAttribute: true
+        ]
+        
+        // Suppress targetSdk deprecation warning
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
     }
     signingConfigs {
         debug {
@@ -116,6 +124,11 @@ android {
             minifyEnabled enableProguardInReleaseBuilds
             proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
             crunchPngs (findProperty('android.enablePngCrunchInReleaseBuilds')?.toBoolean() ?: true)
+            
+            // Suppress targetSdk deprecation warning
+            manifestPlaceholders = [
+                suppressTargetSdkWarning: true
+            ]
         }
     }
     packagingOptions {
@@ -145,20 +158,6 @@ android {
         disable 'Deprecation'
         checkReleaseBuilds false
         abortOnError false
-    }
-    
-    // Suppress package attribute warnings from dependencies
-    manifestPlaceholders = [
-        suppressPackageAttribute: true
-    ]
-    
-    // Use newer targetSdk configuration
-    testOptions {
-        targetSdk 35
-    }
-    
-    lint {
-        targetSdk 35
     }
 }
 

@@ -21,7 +21,8 @@
         "simulator": false,
         "buildConfiguration": "Release",
         "env": {
-          "EXPO_NO_TEMP_DIR": "1"
+          "EXPO_NO_TEMP_DIR": "1",
+          "USE_FRAMEWORKS": "static"
         }
       },
       "android": {
@@ -53,7 +54,8 @@
       "ios": {
         "buildConfiguration": "Release",
         "env": {
-          "EXPO_NO_TEMP_DIR": "1"
+          "EXPO_NO_TEMP_DIR": "1",
+          "USE_FRAMEWORKS": "static"
         }
       },
       "android": {

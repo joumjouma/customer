@@ -30,6 +30,9 @@
           "fetch"
         ],
         "ITSAppUsesNonExemptEncryption": false
+      },
+      "podfileProperties": {
+        "use_modular_headers": true
       }
     },
     "android": {

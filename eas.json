@@ -19,7 +19,10 @@
       "distribution": "internal",
       "ios": {
         "simulator": false,
-        "buildConfiguration": "Release"
+        "buildConfiguration": "Release",
+        "env": {
+          "EXPO_NO_TEMP_DIR": "1"
+        }
       },
       "android": {
         "buildType": "apk",
@@ -48,7 +51,10 @@
     },
     "production": {
       "ios": {
-        "buildConfiguration": "Release"
+        "buildConfiguration": "Release",
+        "env": {
+          "EXPO_NO_TEMP_DIR": "1"
+        }
       },
       "android": {
         "buildType": "app-bundle",

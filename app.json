@@ -17,7 +17,7 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.misscoding.Eco-Share",
       "googleServicesFile": "./GoogleService-Info.plist",
-      "newArchEnabled": true,
+      "newArchEnabled": false,
       "buildNumber": "1",
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "We need your location to show nearby rides and provide accurate navigation.",

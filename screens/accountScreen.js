@@ -13,7 +13,7 @@ import {
 } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import Ionicons from "react-native-vector-icons/Ionicons";
-import { doc, getDoc } from "firebase/firestore";
+import { doc, getDoc, deleteDoc } from "firebase/firestore";
 import { auth, firestore } from "../firebase.config";
 import { LinearGradient } from "expo-linear-gradient";
 
@@ -22,6 +22,7 @@ const AccountScreen = () => {
 
   const [userDetails, setUserDetails] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -83,6 +84,41 @@ const AccountScreen = () => {
       default:
         Alert.alert(option, `Option sélectionnée : ${option}`);
     }
+  };
+
+  const handleDeleteAccount = async () => {
+    Alert.alert(
+      "Supprimer le compte",
+      "Êtes-vous sûr de vouloir supprimer votre compte ? Cette action est irréversible.",
+      [
+        { text: "Annuler", style: "cancel" },
+        {
+          text: "Supprimer",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              setDeleting(true);
+              const user = auth.currentUser;
+              if (!user) throw new Error("Utilisateur non connecté");
+              // Delete Firestore document
+              await deleteDoc(doc(firestore, "Customers", user.uid));
+              // Delete Auth user
+              await user.delete();
+              Alert.alert("Compte supprimé", "Votre compte a été supprimé avec succès.");
+              navigation.reset({ index: 0, routes: [{ name: "LoginScreen" }] });
+            } catch (error) {
+              if (error.code === 'auth/requires-recent-login') {
+                Alert.alert("Erreur", "Veuillez vous reconnecter pour supprimer votre compte.");
+              } else {
+                Alert.alert("Erreur", error.message || "La suppression du compte a échoué.");
+              }
+            } finally {
+              setDeleting(false);
+            }
+          },
+        },
+      ]
+    );
   };
 
   if (loading) {
@@ -216,6 +252,20 @@ const AccountScreen = () => {
             <Text style={styles.optionSubtext}>Mettre à jour votre mot de passe</Text>
           </View>
           <Ionicons name="chevron-forward" size={22} color="#666" />
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.optionItem, { backgroundColor: '#2a0000', borderColor: '#ff5252', borderWidth: 1, marginTop: 20 }]}
+          onPress={handleDeleteAccount}
+          disabled={deleting}
+        >
+          <View style={styles.optionIconContainer}>
+            <Ionicons name="trash-outline" size={22} color="#ff5252" />
+          </View>
+          <View style={styles.optionTextContainer}>
+            <Text style={[styles.optionText, { color: '#ff5252' }]}>Supprimer le compte</Text>
+            <Text style={[styles.optionSubtext, { color: '#ffb3b3' }]}>Supprimez définitivement votre compte</Text>
+          </View>
         </TouchableOpacity>
 
         <View style={styles.footer}>

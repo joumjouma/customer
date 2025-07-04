@@ -291,22 +291,8 @@ const FindingDriverScreen = () => {
           
           if (!navigationDoneRef.current) {
             navigationDoneRef.current = true;
-            navigation.replace("DriverFoundScreen", {
-              rideType,
-              distance,
-              duration,
-              driverName: data.driverName || "Chauffeur",
-              driverPhoto: data.driverPhoto,
-              driverId: data.driverId,
-              driverPhone: data.driverPhone,
-              origin: {
-                ...origin,
-                address: origin?.address || (originAddress !== "Chargement de l'adresse..." ? originAddress : "Origine")
-              },
-              destination: {
-                ...destination,
-                address: destination?.address || (destinationAddress !== "Chargement de l'adresse..." ? destinationAddress : "Destination")
-              },
+            navigation.replace("HomeTabs", {
+              screen: "Activity"
             });
           }
         }

@@ -32,7 +32,7 @@ function RegisterScreen() {
   const [password, setPassword] = useState("");
   const [fname, setFname] = useState("");
   const [lname, setLname] = useState("");
-  const [number, setNumber] = useState("");
+  const [number, setNumber] = useState(Platform.OS === 'ios' ? '+253' : '');
   const [loading, setLoading] = useState(false);
   const [verificationId, setVerificationId] = useState("");
   const [verificationCode, setVerificationCode] = useState("");
@@ -44,6 +44,13 @@ function RegisterScreen() {
   const phoneInput = useRef(null);
 
   const navigation = useNavigation();
+
+  // When switching to phone registration on iOS, prefill +253 if empty
+  React.useEffect(() => {
+    if (Platform.OS === 'ios' && registrationMethod === 'phone' && !number) {
+      setNumber('+253');
+    }
+  }, [registrationMethod]);
 
   const sendVerificationCode = async () => {
     try {
@@ -292,7 +299,16 @@ function RegisterScreen() {
                 <CustomPhoneInput
                   value={number}
                   onChangeFormattedText={(text) => {
-                    setNumber(text);
+                    if (Platform.OS === 'ios') {
+                      // Prevent removing the +253 prefix
+                      if (!text.startsWith('+253')) {
+                        setNumber('+253');
+                      } else {
+                        setNumber(text);
+                      }
+                    } else {
+                      setNumber(text);
+                    }
                   }}
                   containerStyle={styles.phoneInputContainer}
                   textContainerStyle={styles.phoneTextContainer}

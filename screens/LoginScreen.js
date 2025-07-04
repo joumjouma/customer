@@ -27,13 +27,13 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { auth, firestore } from "../firebase.config";
 import { LinearGradient } from "expo-linear-gradient";
 import CustomPhoneInput from "./CustomPhoneInput";
-// import { FirebaseRecaptchaVerifierModal } from 'expo-firebase-recaptcha';
+import { FirebaseRecaptchaVerifierModal } from 'expo-firebase-recaptcha';
 import { firebaseConfig } from '../firebase.config';
 
 function LoginScreen() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [phoneNumber, setPhoneNumber] = useState("");
+  const [phoneNumber, setPhoneNumber] = useState(Platform.OS === 'ios' ? '+253' : '');
   const [fname, setFname] = useState("");
   const [lname, setLname] = useState("");
   const [loginMethod, setLoginMethod] = useState("phone"); // Default to 'phone' for Téléphone tab
@@ -45,7 +45,7 @@ function LoginScreen() {
   const [error, setError] = useState('');
   const [showVerification, setShowVerification] = useState(false);
   const phoneInput = useRef(null);
-  // const recaptchaVerifier = useRef(null);
+  const recaptchaVerifier = useRef(null);
 
   // Set up reCAPTCHA verifier
   useEffect(() => {
@@ -221,10 +221,12 @@ function LoginScreen() {
         verId = await phoneProvider.verifyPhoneNumber(formattedPhone, window.recaptchaVerifier);
       } else {
         // For mobile platforms, use expo-firebase-recaptcha
-        // verId = await phoneProvider.verifyPhoneNumber(formattedPhone, recaptchaVerifier.current);
-        setError('Phone authentication temporarily disabled. Please use email login.');
-        setLoading(false);
-        return;
+        if (!recaptchaVerifier.current) {
+          setError('Erreur de configuration reCAPTCHA. Veuillez réessayer.');
+          setLoading(false);
+          return;
+        }
+        verId = await phoneProvider.verifyPhoneNumber(formattedPhone, recaptchaVerifier.current);
       }
       
       setVerificationId(verId);
@@ -406,10 +408,17 @@ function LoginScreen() {
     }, 500);
   };
 
+  // When switching to phone login on iOS, prefill +253 if empty
+  useEffect(() => {
+    if (Platform.OS === 'ios' && loginMethod === 'phone' && !phoneNumber) {
+      setPhoneNumber('+253');
+    }
+  }, [loginMethod]);
+
   return (
     <LinearGradient
       colors={isDarkMode ? ['#121212', '#1a1a1a'] : ['#ffffff', '#f0f0f0']}
-      style={[styles.container, { backgroundColor: isDarkMode ? '#121212' : '#ffffff' }]}
+      style={[styles.container, { backgroundColor: isDarkMode ? '#121212' : '#ffffff', overflow: 'visible' }]}
     >
       <StatusBar barStyle={isDarkMode ? "light-content" : "dark-content"} />
       
@@ -421,12 +430,12 @@ function LoginScreen() {
         <Ionicons name={isDarkMode ? "sunny" : "moon"} size={24} color="#fff" />
       </TouchableOpacity>
 
-      {/* <FirebaseRecaptchaVerifierModal
+      <FirebaseRecaptchaVerifierModal
         ref={recaptchaVerifier}
         firebaseConfig={firebaseConfig}
-      /> */}
+      />
 
-      <ScrollView contentContainerStyle={styles.scrollContainer}>
+      <ScrollView contentContainerStyle={[styles.scrollContainer, { overflow: 'visible' }] }>
         <Image 
           style={styles.logo} 
           source={CavalLogo} 
@@ -549,18 +558,29 @@ function LoginScreen() {
                   </View>
                   
                   <View style={styles.inputContainer}>
-                    <CustomPhoneInput
-                      value={phoneNumber}
-                      onChangeFormattedText={(text) => {
-                        setPhoneNumber(text);
-                      }}
-                      containerStyle={styles.phoneInputContainer}
-                      textContainerStyle={styles.phoneTextContainer}
-                      textInputStyle={styles.phoneInputText}
-                      codeTextStyle={styles.phoneCodeText}
-                      defaultCode="DJ"
-                      placeholder="Numéro de téléphone"
-                    />
+                    <View style={{ zIndex: 9999, elevation: 20, overflow: 'visible' }}>
+                      <CustomPhoneInput
+                        value={phoneNumber}
+                        onChangeFormattedText={(text) => {
+                          if (Platform.OS === 'ios') {
+                            // Prevent removing the +253 prefix
+                            if (!text.startsWith('+253')) {
+                              setPhoneNumber('+253');
+                            } else {
+                              setPhoneNumber(text);
+                            }
+                          } else {
+                            setPhoneNumber(text);
+                          }
+                        }}
+                        containerStyle={styles.phoneInputContainer}
+                        textContainerStyle={styles.phoneTextContainer}
+                        textInputStyle={styles.phoneInputText}
+                        codeTextStyle={styles.phoneCodeText}
+                        defaultCode="DJ"
+                        placeholder="Numéro de téléphone"
+                      />
+                    </View>
                   </View>
                   <Text style={styles.infoText}>
                     Vous n'avez pas besoin de créer un compte si vous vous connectez avec votre numéro de téléphone.

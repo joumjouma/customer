@@ -20,7 +20,7 @@ import MapView, { Marker, PROVIDER_DEFAULT } from "react-native-maps";
 import MapViewDirections from "react-native-maps-directions";
 import { useRoute, useNavigation, CommonActions } from "@react-navigation/native";
 import { GOOGLE_MAPS_APIKEY } from "@env";
-import { doc, onSnapshot, updateDoc } from "firebase/firestore";
+import { doc, onSnapshot, updateDoc, getDoc, setDoc } from "firebase/firestore";
 import { firestore } from "../firebase.config";
 import { Ionicons, MaterialIcons, Feather, FontAwesome5 } from "@expo/vector-icons";
 import * as Location from "expo-location";
@@ -135,6 +135,11 @@ const DriverFoundScreen = () => {
   const [showHelpModal, setShowHelpModal] = useState(false);
   const [selectedReason, setSelectedReason] = useState(null);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [showOnTheWayMessage, setShowOnTheWayMessage] = useState(false);
+  const [showFareModal, setShowFareModal] = useState(false);
+  const [userDriverRating, setUserDriverRating] = useState(0);
+  const [selectedComments, setSelectedComments] = useState([]);
+  const [showRatingModal, setShowRatingModal] = useState(false);
 
   const mapRef = useRef(null);
   const pulseAnimationRef = useRef(null);
@@ -149,24 +154,15 @@ const DriverFoundScreen = () => {
       if (docSnap.exists()) {
         const data = docSnap.data();
         setRideStatus(data.status);
-        
-        // If ride is completed, navigate to HomeTabs
+        // Transition to destination phase if customer is picked up
+        if (data.customerPickedUp) {
+          setTripPhase('to-destination');
+        } else {
+          setTripPhase('pickup');
+        }
+        // If ride is completed, show fare modal and navigate to HomeTabs
         if (data.status === "completed") {
-          navigation.dispatch(
-            CommonActions.reset({
-              index: 0,
-              routes: [
-                { 
-                  name: 'HomeTabs',
-                  state: {
-                    routes: [
-                      { name: 'Home' }
-                    ]
-                  }
-                }
-              ],
-            })
-          );
+          setShowFareModal(true);
         }
       }
     });
@@ -449,6 +445,113 @@ const DriverFoundScreen = () => {
     }
   };
 
+  const handleRatingSubmit = async () => {
+    try {
+      if (userDriverRating === 0) {
+        Alert.alert("Erreur", "Veuillez donner une note au chauffeur");
+        return;
+      }
+
+      // Save rating and comments to Firebase
+      const ratingData = {
+        rideId: rideId,
+        driverId: driverId,
+        customerId: getAuth().currentUser?.uid,
+        rating: userDriverRating,
+        comments: selectedComments,
+        createdAt: new Date(),
+        driverName: driverName,
+        customerName: route.params?.customerName || "Client"
+      };
+
+      // Add to ratings collection
+      const ratingRef = doc(firestore, "driverRatings", `${rideId}_${getAuth().currentUser?.uid}`);
+      await setDoc(ratingRef, ratingData);
+
+      // Update driver's average rating
+      const driverRef = doc(firestore, "Drivers", driverId);
+      const driverDoc = await getDoc(driverRef);
+      if (driverDoc.exists()) {
+        const currentData = driverDoc.data();
+        const currentRatings = currentData.ratings || [];
+        const newRatings = [...currentRatings, userDriverRating];
+        const averageRating = newRatings.reduce((a, b) => a + b, 0) / newRatings.length;
+        
+        await updateDoc(driverRef, {
+          ratings: newRatings,
+          averageRating: averageRating,
+          totalRatings: newRatings.length
+        });
+      }
+
+      setShowRatingModal(false);
+      setShowFareModal(false);
+      Alert.alert("Merci", "Votre évaluation a été enregistrée", [
+        {
+          text: "OK",
+          onPress: () => {
+            navigation.dispatch(
+              CommonActions.reset({
+                index: 0,
+                routes: [
+                  { 
+                    name: 'HomeTabs',
+                    state: {
+                      routes: [
+                        { name: 'Home' }
+                      ]
+                    }
+                  }
+                ],
+              })
+            );
+          }
+        }
+      ]);
+    } catch (error) {
+      console.error("Error saving rating:", error);
+      Alert.alert("Erreur", "Impossible d'enregistrer l'évaluation");
+    }
+  };
+
+  const toggleComment = (comment) => {
+    setSelectedComments(prev => 
+      prev.includes(comment) 
+        ? prev.filter(c => c !== comment)
+        : [...prev, comment]
+    );
+  };
+
+  const getCommentSuggestions = (rating) => {
+    if (rating <= 3) {
+      return [
+        "Conduite dangereuse",
+        "Voiture sale",
+        "Chauffeur impoli",
+        "Retard important",
+        "Prix incorrect",
+        "Autre"
+      ];
+    } else {
+      return [
+        "Conduite excellente",
+        "Voiture propre",
+        "Chauffeur poli",
+        "À l'heure",
+        "Prix correct",
+        "Autre"
+      ];
+    }
+  };
+
+  useEffect(() => {
+    if (tripPhase === 'to-destination') {
+      setShowOnTheWayMessage(true);
+      const timer = setTimeout(() => setShowOnTheWayMessage(false), 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [tripPhase]);
+
   if (!mapRegion) {
     return (
       <View style={styles.loadingContainer}>
@@ -538,27 +641,7 @@ const DriverFoundScreen = () => {
             </Marker>
           )}
           
-          {/* Test marker to verify markers work */}
-          <Marker 
-            coordinate={{ latitude: 11.5890, longitude: 43.1450 }}
-            pinColor="red"
-            title="Test Marker"
-            description="This is a test marker"
-          />
-          
           {/* Destination marker */}
-          {(() => {
-            console.log("=== DESTINATION DEBUG ===");
-            console.log("destinationData:", destinationData);
-            console.log("destination:", destination);
-            console.log("destinationLat:", destinationLat);
-            console.log("destinationLng:", destinationLng);
-            console.log("destinationAddress:", destinationAddress);
-            console.log("hasDestinationData:", !!(destinationData || destination));
-            console.log("hasCoords:", !!(destinationLat && destinationLng));
-            console.log("==========================");
-            return null;
-          })()}
           {(destinationData || destination) && (
             <Marker 
               identifier="destination"
@@ -570,45 +653,43 @@ const DriverFoundScreen = () => {
             />
           )}
           
-          {/* Fallback destination marker if no destination data */}
-          {!destinationData && !destination && destinationLat && destinationLng && (
-            <Marker 
-              identifier="destination"
-              coordinate={{ latitude: parseFloat(destinationLat), longitude: parseFloat(destinationLng) }} 
-              pinColor="#FF6B00"
-              title="Destination"
-              description={destinationAddress || "Destination"}
-              zIndex={1000}
-            />
-          )}
-          
           {/* Driver marker */}
-          {(() => {
-            console.log("=== DRIVER DEBUG ===");
-            console.log("driverLocation:", driverLocation);
-            console.log("driverId:", driverId);
-            console.log("driverPhoto:", driverPhoto);
-            console.log("==========================");
-            return null;
-          })()}
           {driverLocation && (
             <Marker 
               coordinate={driverLocation} 
-              pinColor="blue"
               title="Driver"
               description={driverName || "Your driver"}
               zIndex={1000}
-            />
+            >
+              <View style={styles.driverMarkerContainer}>
+                <View style={styles.driverMarkerHalo} />
+                <View style={styles.driverMarkerInner}>
+                  <Image
+                    source={driverPhoto ? { uri: driverPhoto } : require("../assets/driver_placeholder.png")}
+                    style={styles.driverMarker}
+                  />
+                </View>
+              </View>
+            </Marker>
           )}
           
           {/* Fallback driver marker if no driver location but we have driver data */}
           {!driverLocation && driverId && (
             <Marker 
               coordinate={{ latitude: 11.5890, longitude: 43.1450 }} 
-              pinColor="blue"
               title="Driver"
               description="Driver location unavailable"
-            />
+            >
+              <View style={styles.driverMarkerContainer}>
+                <View style={styles.driverMarkerHalo} />
+                <View style={styles.driverMarkerInner}>
+                  <Image
+                    source={driverPhoto ? { uri: driverPhoto } : require("../assets/driver_placeholder.png")}
+                    style={styles.driverMarker}
+                  />
+                </View>
+              </View>
+            </Marker>
           )}
         </MapView>
 
@@ -655,14 +736,25 @@ const DriverFoundScreen = () => {
         </View>
 
         {/* Notification about driver arrival - moved to top */}
-        <View style={styles.topNotificationContainer}>
-          <View style={styles.notificationIconContainer}>
-            <Ionicons name="notifications" size={16} color={THEME.primary} />
+        {tripPhase === 'pickup' && (
+          <View style={styles.topNotificationContainer}>
+            <View style={styles.notificationIconContainer}>
+              <Ionicons name="notifications" size={16} color={THEME.primary} />
+            </View>
+            <Text style={styles.notificationText}>
+              Vous serez contacté lorsque le chauffeur arrivera
+            </Text>
           </View>
-          <Text style={styles.notificationText}>
-            Vous serez contacté lorsque le chauffeur arrivera
-          </Text>
-        </View>
+        )}
+        {/* Customer is on the way notification */}
+        {tripPhase === 'to-destination' && showOnTheWayMessage && (
+          <View style={[styles.topNotificationContainer, { backgroundColor: '#e6f7ff', borderColor: THEME.primary, borderWidth: 1 }]}> 
+            <View style={styles.notificationIconContainer}>
+              <Ionicons name="car" size={16} color={THEME.primary} />
+            </View>
+            <Text style={[styles.notificationText, { color: THEME.primary }]}>Vous êtes en route vers votre destination !</Text>
+          </View>
+        )}
 
         {/* Bottom Sheet Overlay */}
         <Animated.View style={[styles.overlayContainer, { height: overlayHeightAnim }]}>
@@ -985,6 +1077,116 @@ const DriverFoundScreen = () => {
             </View>
           </BlurView>
         </Modal>
+
+        {/* Fare Modal */}
+        {showFareModal && (
+          <View style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0,0,0,0.7)',
+            justifyContent: 'center',
+            alignItems: 'center',
+            zIndex: 9999,
+          }}>
+            <View style={{
+              backgroundColor: '#fff',
+              borderRadius: 20,
+              padding: 32,
+              alignItems: 'center',
+              shadowColor: '#000',
+              shadowOpacity: 0.3,
+              shadowRadius: 10,
+              elevation: 10,
+              maxWidth: '90%',
+              maxHeight: '80%',
+            }}>
+              <Ionicons name="cash" size={48} color={THEME.primary} style={{ marginBottom: 16 }} />
+              <Text style={{ fontSize: 22, fontWeight: 'bold', color: THEME.primary, marginBottom: 12 }}>Trajet terminé</Text>
+              <Text style={{ fontSize: 18, color: '#222', marginBottom: 8 }}>Veuillez régler le montant suivant :</Text>
+              <Text style={{ fontSize: 32, fontWeight: 'bold', color: THEME.primary, marginBottom: 20 }}>{fare ? `${fare} FDJ` : '-- FDJ'}</Text>
+              
+              {/* Rating Section */}
+              <View style={styles.ratingSection}>
+                <Text style={styles.ratingTitle}>Évaluez votre chauffeur</Text>
+                <View style={styles.starsContainer}>
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <TouchableOpacity
+                      key={star}
+                      onPress={() => setUserDriverRating(star)}
+                      style={styles.starButton}
+                    >
+                      <Ionicons
+                        name={userDriverRating >= star ? "star" : "star-outline"}
+                        size={32}
+                        color={userDriverRating >= star ? "#FFD700" : "#ccc"}
+                      />
+                    </TouchableOpacity>
+                  ))}
+                </View>
+                
+                {userDriverRating > 0 && (
+                  <View style={styles.commentsSection}>
+                    <Text style={styles.commentsTitle}>
+                      {userDriverRating <= 3 ? "Que s'est-il mal passé ?" : "Qu'avez-vous apprécié ?"}
+                    </Text>
+                    <View style={styles.commentsGrid}>
+                      {getCommentSuggestions(userDriverRating).map((comment) => (
+                        <TouchableOpacity
+                          key={comment}
+                          style={[
+                            styles.commentChip,
+                            selectedComments.includes(comment) && styles.commentChipSelected
+                          ]}
+                          onPress={() => toggleComment(comment)}
+                        >
+                          <Text style={[
+                            styles.commentText,
+                            selectedComments.includes(comment) && styles.commentTextSelected
+                          ]}>
+                            {comment}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  </View>
+                )}
+                
+                <TouchableOpacity
+                  style={[styles.submitRatingButton, userDriverRating === 0 && styles.submitRatingButtonDisabled]}
+                  onPress={handleRatingSubmit}
+                  disabled={userDriverRating === 0}
+                >
+                  <Text style={styles.submitRatingButtonText}>Soumettre l'évaluation</Text>
+                </TouchableOpacity>
+              </View>
+              
+              <Text style={{ fontSize: 16, color: '#555', textAlign: 'center', marginTop: 20 }}>Merci d'avoir utilisé Caval !</Text>
+            </View>
+          </View>
+        )}
+
+        {/* WhatsApp Support Button - Always Visible */}
+        <View style={styles.securityContainer}>
+          <TouchableOpacity
+            style={styles.whatsappFab}
+            onPress={() => {
+              const message = encodeURIComponent('Bonjour, je souhaite avoir de l\'aide concernant ma course Caval.');
+              const phone = '25377702036';
+              const url = `https://wa.me/${phone}?text=${message}`;
+              Linking.openURL(url);
+            }}
+            activeOpacity={0.85}
+          >
+            <Ionicons name="logo-whatsapp" size={28} color="#fff" />
+          </TouchableOpacity>
+          <View style={styles.securityTextContainer}>
+            <Text style={styles.securityTitle}>Besoin d'aide ?</Text>
+            <Text style={styles.securitySubtitle}>Support 24/7</Text>
+          </View>
+        </View>
       </View>
     </SafeAreaView>
   );
@@ -1668,7 +1870,138 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "600",
     color: "#FFFFFF",
-  }
+  },
+  whatsappFab: {
+    position: 'absolute',
+    right: 20,
+    bottom: Platform.OS === 'android' ? 20 : 40,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: '#25D366',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#25D366',
+    shadowOpacity: 0.25,
+    shadowOffset: { width: 0, height: 4 },
+    shadowRadius: 8,
+    elevation: 6,
+    zIndex: 100,
+  },
+  securityContainer: {
+    position: 'absolute',
+    right: 20,
+    bottom: Platform.OS === 'android' ? 220 : 240,
+    flexDirection: 'column',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.85)',
+    borderRadius: 25,
+    padding: 8,
+    paddingBottom: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.4,
+    shadowRadius: 8,
+    elevation: 8,
+    zIndex: 100,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  securityTextContainer: {
+    flexDirection: 'column',
+    marginTop: -4,
+    alignItems: 'center',
+  },
+  securityTitle: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '700',
+    textAlign: 'center',
+    lineHeight: 16,
+    marginBottom: 1,
+  },
+  securitySubtitle: {
+    color: 'rgba(255, 255, 255, 0.8)',
+    fontSize: 11,
+    fontWeight: '500',
+    textAlign: 'center',
+    lineHeight: 12,
+  },
+  // Rating System Styles
+  ratingSection: {
+    width: '100%',
+    marginTop: 20,
+    marginBottom: 20,
+  },
+  ratingTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+    textAlign: 'center',
+    marginBottom: 15,
+  },
+  starsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    marginBottom: 20,
+  },
+  starButton: {
+    marginHorizontal: 5,
+    padding: 5,
+  },
+  commentsSection: {
+    marginTop: 15,
+  },
+  commentsTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+    textAlign: 'center',
+    marginBottom: 15,
+  },
+  commentsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    marginBottom: 20,
+  },
+  commentChip: {
+    backgroundColor: '#f0f0f0',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+    margin: 4,
+    borderWidth: 1,
+    borderColor: '#ddd',
+  },
+  commentChipSelected: {
+    backgroundColor: THEME.primary,
+    borderColor: THEME.primary,
+  },
+  commentText: {
+    fontSize: 12,
+    color: '#666',
+    fontWeight: '500',
+  },
+  commentTextSelected: {
+    color: '#fff',
+  },
+  submitRatingButton: {
+    backgroundColor: THEME.primary,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 25,
+    marginTop: 10,
+  },
+  submitRatingButtonDisabled: {
+    backgroundColor: '#ccc',
+  },
+  submitRatingButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+    textAlign: 'center',
+  },
 });
 
 export default DriverFoundScreen;

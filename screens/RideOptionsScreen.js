@@ -353,31 +353,27 @@ const RideOptionsScreen = () => {
     );
   };
 
-  // Updated fare calculation function with the new pricing structure
+  // Updated fare calculation function with initial 3km pricing and 150 FDJ per km after
   const calculateFare = (distance, rideType) => {
     const distanceInKm = distance; // Distance is already in kilometers
-    let baseFare = 0;
-    let additionalFare = 0;
+    let totalFare = 0;
 
     if (rideType === 'Caval Privé') {
-      baseFare = 400; // Initial price for 3km or less
-      if (distanceInKm > 3) {
-        // Calculate additional distance in 0.5km increments
+      if (distanceInKm <= 3) {
+        totalFare = 400; // Initial price for 3km or less
+      } else {
         const additionalDistance = distanceInKm - 3;
-        const halfKmIncrements = Math.ceil(additionalDistance / 0.5);
-        additionalFare = halfKmIncrements * 50;
+        totalFare = 400 + (additionalDistance * 150); // 400 + 150 per additional km
       }
     } else if (rideType === 'Caval moto') {
-      baseFare = 150; // Initial price for 3km or less
-      if (distanceInKm > 3) {
-        // Calculate additional distance in 0.5km increments
+      if (distanceInKm <= 3) {
+        totalFare = 150; // Initial price for 3km or less
+      } else {
         const additionalDistance = distanceInKm - 3;
-        const halfKmIncrements = Math.ceil(additionalDistance / 0.5);
-        additionalFare = halfKmIncrements * 50;
+        totalFare = 150 + (additionalDistance * 150); // 150 + 150 per additional km
       }
     }
 
-    const totalFare = baseFare + additionalFare;
     // Round to the nearest 50
     return Math.round(totalFare / 50) * 50;
   };

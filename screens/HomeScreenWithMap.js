@@ -765,7 +765,7 @@ const HomeScreenWithMap = ({ userName = "User" }) => {
         maxHeight: Platform.OS === 'android' ? '60%' : '50%',
         zIndex: 5,
         position: 'absolute',
-        bottom: keyboardVisible ? (Platform.OS === 'ios' ? 500 : keyboardHeight - 50) : Platform.OS === 'android' ? 20 : 0,
+        bottom: keyboardVisible ? (Platform.OS === 'ios' ? 1 : keyboardHeight + 10) : Platform.OS === 'android' ? 80 : 0,
         left: 0,
         right: 0,
       },
@@ -1088,6 +1088,46 @@ const HomeScreenWithMap = ({ userName = "User" }) => {
         elevation: 3,
         zIndex: 20,
       },
+      whatsappOrderButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#25D366',
+        borderRadius: 12,
+        marginHorizontal: 16,
+        marginTop: 12,
+        marginBottom: 0,
+        paddingVertical: 12,
+        paddingHorizontal: 16,
+        shadowColor: '#25D366',
+        shadowOpacity: 0.12,
+        shadowOffset: { width: 0, height: 2 },
+        shadowRadius: 8,
+        elevation: 2,
+      },
+      whatsappOrderText: {
+        color: '#fff',
+        fontSize: 16,
+        fontWeight: 'bold',
+        textAlign: 'center',
+      },
+      whatsappFab: {
+        position: 'absolute',
+        right: 24,
+        bottom: Platform.OS === 'android' ? 100 : 120,
+        width: 60,
+        height: 60,
+        borderRadius: 30,
+        backgroundColor: '#25D366',
+        justifyContent: 'center',
+        alignItems: 'center',
+        shadowColor: '#25D366',
+        shadowOpacity: 0.25,
+        shadowOffset: { width: 0, height: 4 },
+        shadowRadius: 8,
+        elevation: 6,
+        zIndex: 100,
+      },
     });
   };
 
@@ -1362,7 +1402,7 @@ const HomeScreenWithMap = ({ userName = "User" }) => {
               styles.bottomContainer,
               {
                 position: 'absolute',
-                bottom: keyboardVisible ? (Platform.OS === 'ios' ? 1 : keyboardHeight - 50) : Platform.OS === 'android' ? 20 : 0,
+                bottom: keyboardVisible ? (Platform.OS === 'ios' ? 1 : keyboardHeight + 10) : Platform.OS === 'android' ? 80 : 0,
                 left: 0,
                 right: 0,
                 opacity: fadeAnim,
@@ -1379,17 +1419,19 @@ const HomeScreenWithMap = ({ userName = "User" }) => {
               </View>
               
               {!showPickupInput ? (
-                <View style={styles.rowContainer}>
-                  <Text style={styles.greetingText}>
-                    Bonjour, <Text style={{ fontWeight: "700" }}>{customerFirstName}</Text> !
-                  </Text>
-                  <TouchableOpacity 
-                    style={styles.smallButton} 
-                    onPress={() => { setShowPickupInput(true); setPickupInputVisible(true); }}
-                  >
-                    <Text style={styles.smallButtonText}>Modifier lieu de départ</Text>
-                  </TouchableOpacity>
-                </View>
+                <>
+                  <View style={styles.rowContainer}>
+                    <Text style={styles.greetingText}>
+                      Bonjour, <Text style={{ fontWeight: "700" }}>{customerFirstName}</Text> !
+                    </Text>
+                    <TouchableOpacity 
+                      style={styles.smallButton} 
+                      onPress={() => { setShowPickupInput(true); setPickupInputVisible(true); }}
+                    >
+                      <Text style={styles.smallButtonText}>Modifier lieu de départ</Text>
+                    </TouchableOpacity>
+                  </View>
+                </>
               ) : (
                 <>
                   <Text style={styles.greetingText}>
@@ -1609,6 +1651,22 @@ const HomeScreenWithMap = ({ userName = "User" }) => {
                 />
               )}
             </Animated.View>
+          )}
+
+          {/* WHATSAPP ORDER FAB */}
+          {!selectionMode && (
+            <TouchableOpacity
+              style={styles.whatsappFab}
+              onPress={() => {
+                const message = encodeURIComponent('Bonjour, je souhaite commander une course.');
+                const phone = '25377702036';
+                const url = `https://wa.me/${phone}?text=${message}`;
+                Linking.openURL(url);
+              }}
+              activeOpacity={0.85}
+            >
+              <Ionicons name="logo-whatsapp" size={30} color="#fff" />
+            </TouchableOpacity>
           )}
         </View>
       </KeyboardAvoidingView>

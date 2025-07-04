@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "Eco-share",
-    "slug": "Eco-share",
+    "name": "Caval Customer",
+    "slug": "caval-customer",
     "owner": "zouhair123",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
+    "icon": "./assets/caval-customer-icon.png",
     "userInterfaceStyle": "light",
     "scheme": "com.googleusercontent.apps.1007561335979-uiduf2a3h59mjcdassp5hl3rgljr5tes",
     "splash": {
@@ -18,7 +18,7 @@
       "bundleIdentifier": "com.misscoding.Eco-Share",
       "googleServicesFile": "./GoogleService-Info.plist",
       "newArchEnabled": false,
-      "buildNumber": "5",
+      "buildNumber": "6",
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "We need your location to show nearby rides and provide accurate navigation.",
         "NSLocationAlwaysAndWhenInUseUsageDescription": "We need your location to show nearby rides and provide accurate navigation even when the app is in the background.",

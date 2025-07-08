@@ -18,7 +18,7 @@
       "bundleIdentifier": "com.misscoding.Eco-Share-Customer",
       "googleServicesFile": "./GoogleService-Info.plist",
       "newArchEnabled": false,
-      "buildNumber": "24",
+      "buildNumber": "25",
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "We need your location to show nearby rides and provide accurate navigation.",
         "NSLocationAlwaysAndWhenInUseUsageDescription": "We need your location to show nearby rides and provide accurate navigation even when the app is in the background.",

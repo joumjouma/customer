@@ -75,6 +75,9 @@ const RideOptionsScreen = () => {
   const originAutocompleteRef = useRef(null);
   const destinationAutocompleteRef = useRef(null);
 
+  // Add a ref to store the current map center
+  const mapCenterRef = useRef(null);
+
   // Fallback initial region
   const initialRegion = {
     latitude: origin && destination 
@@ -676,17 +679,20 @@ const RideOptionsScreen = () => {
     }
   };
 
+  // Update mapCenterRef in handleRegionChangeComplete
   const handleRegionChangeComplete = async (newRegion) => {
     if (selectionMode) {
+      mapCenterRef.current = {
+        latitude: newRegion.latitude,
+        longitude: newRegion.longitude
+      };
       setSelectedLocation({
         latitude: newRegion.latitude,
         longitude: newRegion.longitude
       });
-
       try {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 10000);
-
         const response = await fetch(
           `https://maps.googleapis.com/maps/api/geocode/json?latlng=${newRegion.latitude},${newRegion.longitude}&key=${GOOGLE_API_KEY}`,
           {
@@ -696,7 +702,6 @@ const RideOptionsScreen = () => {
         );
         clearTimeout(timeoutId);
         const data = await response.json();
-        
         if (data.status === "OK" && data.results && data.results.length > 0) {
           const address = data.results[0].formatted_address;
           setSearchText(address);
@@ -707,6 +712,72 @@ const RideOptionsScreen = () => {
         } else {
           console.error("Error reverse geocoding:", error);
         }
+      }
+    }
+  };
+
+  // When confirming pin drop, use map center coordinate
+  const confirmPinDrop = async () => {
+    if (!selectionMode) return;
+    const coordinate = mapCenterRef.current || selectedLocation;
+    setSelectedLocation(coordinate);
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
+      const response = await fetch(
+        `https://maps.googleapis.com/maps/api/geocode/json?latlng=${coordinate.latitude},${coordinate.longitude}&key=${GOOGLE_API_KEY}`,
+        {
+          signal: controller.signal,
+          timeout: 10000
+        }
+      );
+      clearTimeout(timeoutId);
+      const data = await response.json();
+      if (data.status === "OK" && data.results && data.results.length > 0) {
+        const address = data.results[0].formatted_address;
+        setSearchText(address);
+        if (selectionMode === 'pickup') {
+          const newOrigin = {
+            latitude: coordinate.latitude,
+            longitude: coordinate.longitude,
+            address: address
+          };
+          setModifiedOrigin(newOrigin);
+          if (modifiedDestination || destination) {
+            const newDistance = calculateDistance(newOrigin, modifiedDestination || destination);
+            setDistance(newDistance);
+            const cavalPriveFare = calculateFare(newDistance, 'Caval Privé');
+            const cavalMotoFare = calculateFare(newDistance, 'Caval moto');
+            setCavalPriveFare(cavalPriveFare);
+            setCavalMotoFare(cavalMotoFare);
+          }
+        } else if (selectionMode === 'dropoff') {
+          const newDestination = {
+            latitude: coordinate.latitude,
+            longitude: coordinate.longitude,
+            address: address
+          };
+          setModifiedDestination(newDestination);
+          if (modifiedOrigin || origin) {
+            const newDistance = calculateDistance(modifiedOrigin || origin, newDestination);
+            setDistance(newDistance);
+            const cavalPriveFare = calculateFare(newDistance, 'Caval Privé');
+            const cavalMotoFare = calculateFare(newDistance, 'Caval moto');
+            setCavalPriveFare(cavalPriveFare);
+            setCavalMotoFare(cavalMotoFare);
+          }
+        }
+        setSelectionMode(null);
+        setIsFullScreenMap(false);
+        mapRef.current?.animateToRegion({ ...coordinate, latitudeDelta: 0.02, longitudeDelta: 0.02 }, 500);
+      }
+    } catch (error) {
+      if (error.name === 'AbortError') {
+        console.error("Request timed out");
+        Alert.alert("Erreur", "La requête a expiré. Veuillez réessayer.");
+      } else {
+        console.error("Error reverse geocoding:", error);
+        Alert.alert("Erreur", "Impossible de trouver l'adresse à cet emplacement.");
       }
     }
   };
@@ -845,7 +916,7 @@ const RideOptionsScreen = () => {
                 </View>
                 <TouchableOpacity 
                   style={styles.selectionConfirmButton} 
-                  onPress={() => handleMapPress({ nativeEvent: { coordinate: selectedLocation || { latitude: 0, longitude: 0 } } })}
+                  onPress={confirmPinDrop}
                 >
                   <Text style={styles.selectionConfirmButtonText}>
                     Confirmer {selectionMode === 'pickup' ? 'le point de départ' : 'la destination'}

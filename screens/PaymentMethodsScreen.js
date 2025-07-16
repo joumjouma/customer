@@ -1,462 +1,333 @@
-import React, { useState, useEffect } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  FlatList,
-  Modal,
-  Alert,
-  Switch,
-  KeyboardAvoidingView,
+import React from 'react';
+import { 
+  View, 
+  Text, 
+  StyleSheet, 
+  TouchableOpacity, 
+  SafeAreaView,
+  StatusBar,
   ScrollView,
-  Platform,
+  Dimensions
 } from 'react-native';
-// import { CardField, useStripe } from '@stripe/stripe-react-native';
-import { Ionicons, MaterialCommunityIcons, FontAwesome } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
-import {
-  collection,
-  query,
-  where,
-  getDocs,
-  addDoc,
-  deleteDoc,
-  updateDoc,
-  doc,
-} from 'firebase/firestore';
-import { firestore } from '../firebase.config';
-import { getAuth } from 'firebase/auth';
+import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 
-const PaymentMethodsScreen = () => {
-  const navigation = useNavigation();
-  // const { createPaymentMethod } = useStripe();
+const { width } = Dimensions.get('window');
 
-  const [paymentMethods, setPaymentMethods] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [defaultMethod, setDefaultMethod] = useState(null);
-  const [modalVisible, setModalVisible] = useState(false);
-  const [cardDetails, setCardDetails] = useState({});
-
-  useEffect(() => {
-    navigation.setOptions({
-      headerShown: true,
-      headerTitle: 'Méthodes de paiement',
-      headerStyle: { backgroundColor: '#1E1E1E' },
-      headerTintColor: '#FF6F00',
-      headerTitleStyle: { fontWeight: 'bold' },
-      headerLeft: () => (
-        <TouchableOpacity style={styles.headerButton} onPress={() => navigation.goBack()}>
-          <Ionicons name="arrow-back" size={24} color="#FF6F00" />
-        </TouchableOpacity>
-      ),
-    });
-    fetchPaymentMethods();
-  }, [navigation]);
-
-  const fetchPaymentMethods = async () => {
-    setLoading(true);
-    const auth = getAuth();
-    const currentUser = auth.currentUser;
-    if (!currentUser) {
-      setLoading(false);
-      return;
-    }
-    try {
-      const q = query(
-        collection(firestore, 'paymentMethods'),
-        where('userId', '==', currentUser.uid)
-      );
-      const querySnapshot = await getDocs(q);
-      const methods = [];
-      querySnapshot.forEach((docSnap) => {
-        methods.push({ id: docSnap.id, ...docSnap.data() });
-      });
-      setPaymentMethods(methods);
-      const defaultMethodObj = methods.find((method) => method.isDefault);
-      if (defaultMethodObj) {
-        setDefaultMethod(defaultMethodObj.id);
-      } else if (methods.length > 0) {
-        setDefaultMethod(methods[0].id);
-        setDefaultPaymentMethod(methods[0].id);
-      }
-    } catch (error) {
-      console.error('Error fetching payment methods:', error);
-      Alert.alert('Error', 'Failed to load payment methods');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleAddPaymentMethod = async () => {
-    // Disable card payments
-    Alert.alert(
-      'Paiement par carte désactivé',
-      'Le paiement par carte est temporairement indisponible. Veuillez utiliser le paiement en espèces.',
-      [{ text: 'OK' }]
-    );
-    setModalVisible(false);
-  };
-
-  const addCashPaymentMethod = async () => {
-    try {
-      const auth = getAuth();
-      const currentUser = auth.currentUser;
-      if (!currentUser) {
-        Alert.alert('Error', 'You must be logged in to add a payment method');
-        return;
-      }
-      
-      // Check if cash payment method already exists
-      const existingCashMethod = paymentMethods.find(method => method.type === 'cash');
-      if (existingCashMethod) {
-        Alert.alert('Info', 'Paiement en espèces déjà ajouté');
-        return;
-      }
-      
-      // Mark as default if it's the first payment method
-      const isDefault = paymentMethods.length === 0 ? true : false;
-      
-      const methodData = {
-        userId: currentUser.uid,
-        type: 'cash',
-        isDefault: isDefault,
-        createdAt: new Date(),
-        currency: 'DJF',
-      };
-      
-      console.log('Saving cash payment method to Firestore:', methodData);
-      const docRef = await addDoc(collection(firestore, 'paymentMethods'), methodData);
-      const newMethod = { id: docRef.id, ...methodData };
-      setPaymentMethods([...paymentMethods, newMethod]);
-      if (isDefault) {
-        setDefaultMethod(docRef.id);
-      }
-      Alert.alert('Success', 'Paiement en espèces ajouté avec succès');
-    } catch (err) {
-      console.error('Error adding cash payment method:', err);
-      Alert.alert('Error', `Failed to add cash payment method: ${err.message}`);
-    }
-  };
-
-  const removePaymentMethod = async (id) => {
-    try {
-      await deleteDoc(doc(firestore, 'paymentMethods', id));
-      const updatedMethods = paymentMethods.filter((method) => method.id !== id);
-      setPaymentMethods(updatedMethods);
-      if (defaultMethod === id && updatedMethods.length > 0) {
-        setDefaultMethod(updatedMethods[0].id);
-        setDefaultPaymentMethod(updatedMethods[0].id);
-      }
-      Alert.alert('Success', 'Payment method removed');
-    } catch (error) {
-      console.error('Error removing payment method:', error);
-      Alert.alert('Error', 'Failed to remove payment method');
-    }
-  };
-
-  const setDefaultPaymentMethod = async (id) => {
-    try {
-      if (defaultMethod) {
-        const prevDefaultDoc = doc(firestore, 'paymentMethods', defaultMethod);
-        await updateDoc(prevDefaultDoc, { isDefault: false });
-      }
-      const newDefaultDoc = doc(firestore, 'paymentMethods', id);
-      await updateDoc(newDefaultDoc, { isDefault: true });
-      const updatedMethods = paymentMethods.map((method) => ({
-        ...method,
-        isDefault: method.id === id,
-      }));
-      setPaymentMethods(updatedMethods);
-      setDefaultMethod(id);
-      Alert.alert('Success', 'Default payment method updated');
-    } catch (error) {
-      console.error('Error setting default payment method:', error);
-      Alert.alert('Error', 'Failed to update default payment method');
-    }
-  };
-
-  const renderCardIcon = (brand) => {
-    switch (brand.toLowerCase()) {
-      case 'visa':
-        return <FontAwesome name="cc-visa" size={28} color="#1A1F71" />;
-      case 'mastercard':
-        return <FontAwesome name="cc-mastercard" size={28} color="#EB001B" />;
-      case 'american express':
-      case 'amex':
-        return <FontAwesome name="cc-amex" size={28} color="#2E77BC" />;
-      default:
-        return <FontAwesome name="credit-card" size={28} color="#FF6F00" />;
-    }
-  };
-
-  const renderPaymentMethod = ({ item }) => (
-    <View style={styles.paymentMethodCard}>
-      <View style={styles.cardContent}>
-        <View style={styles.cardIconContainer}>
-          {item.type === 'card' ? (
-            renderCardIcon(item.cardBrand)
-          ) : (
-            <MaterialCommunityIcons name="cash" size={28} color="#4CAF50" />
-          )}
-        </View>
-        <View style={styles.cardDetails}>
-          {item.type === 'card' ? (
-            <>
-              <Text style={styles.cardTitle}>•••• •••• •••• {item.lastFourDigits}</Text>
-              <Text style={styles.cardSubtitle}>
-                {item.cardBrand.toUpperCase()} • Expires {item.expMonth}/{item.expYear}
-              </Text>
-              <Text style={styles.cardCurrency}>DJF • Franc de Djibouti</Text>
-            </>
-          ) : (
-            <Text style={styles.cardTitle}>Paiement en espèces</Text>
-          )}
-        </View>
-      </View>
-      <View style={styles.cardActions}>
-        <TouchableOpacity
-          style={styles.defaultButton}
-          onPress={() => setDefaultPaymentMethod(item.id)}
-        >
-          <View style={styles.radioButton}>
-            {defaultMethod === item.id && <View style={styles.radioButtonInner} />}
-          </View>
-          <Text style={styles.defaultText}>Par défaut</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.deleteButton}
-          onPress={() => {
-            Alert.alert(
-              'Supprimer la méthode de paiement',
-              'Êtes-vous sûr de vouloir supprimer cette méthode de paiement?',
-              [
-                { text: 'Annuler', style: 'cancel' },
-                { text: 'Supprimer', onPress: () => removePaymentMethod(item.id), style: 'destructive' },
-              ]
-            );
-          }}
-        >
-          <Ionicons name="trash-outline" size={20} color="#FF6F00" />
-        </TouchableOpacity>
-      </View>
-    </View>
-  );
-
+const PaymentMethodsScreen = ({ navigation }) => {
   return (
-    <View style={styles.container}>
-      {loading ? (
-        <View style={styles.loadingContainer}>
-          <Text style={styles.loadingText}>Chargement des méthodes de paiement...</Text>
-        </View>
-      ) : (
-        <>
-          <View style={styles.currencyContainer}>
-            <Text style={styles.currencyText}>Devise: Franc de Djibouti (DJF)</Text>
-          </View>
-          {paymentMethods.length === 0 ? (
-            <View style={styles.emptyContainer}>
-              <MaterialCommunityIcons name="cash" size={60} color="#FF6F00" />
-              <Text style={styles.emptyText}>Aucune méthode de paiement</Text>
-              <Text style={styles.emptySubtext}>
-                Ajoutez le paiement en espèces
-              </Text>
-            </View>
-          ) : (
-            <FlatList
-              data={paymentMethods}
-              renderItem={renderPaymentMethod}
-              keyExtractor={(item) => item.id}
-              contentContainerStyle={styles.listContent}
-            />
-          )}
-          <TouchableOpacity style={styles.addButton} onPress={addCashPaymentMethod}>
-            <Ionicons name="add" size={24} color="#fff" />
-            <Text style={styles.addButtonText}>Ajouter le paiement en espèces</Text>
-          </TouchableOpacity>
-        </>
-      )}
-
-      <Modal
-        animationType="slide"
-        transparent={true}
-        visible={modalVisible}
-        onRequestClose={() => setModalVisible(false)}
-      >
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          keyboardVerticalOffset={Platform.OS === 'ios' ? 60 : 20}
-          style={styles.modalContainer}
+    <SafeAreaView style={styles.container}>
+      <StatusBar barStyle="light-content" backgroundColor="#121212" />
+      
+      {/* Header */}
+      <View style={styles.header}>
+        <TouchableOpacity 
+          style={styles.backButton} 
+          onPress={() => navigation.goBack()}
         >
-          <ScrollView
-            contentContainerStyle={styles.modalScrollContainer}
-            keyboardShouldPersistTaps="handled"
-          >
-            <View style={styles.modalContent}>
-              <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>Paiement par carte désactivé</Text>
-                <TouchableOpacity onPress={() => setModalVisible(false)}>
-                  <Ionicons name="close" size={24} color="#FF6F00" />
-                </TouchableOpacity>
-              </View>
-              <View style={styles.disabledMessageContainer}>
-                <MaterialCommunityIcons name="credit-card-off" size={60} color="#FF6F00" />
-                <Text style={styles.disabledMessageText}>
-                  Le paiement par carte est temporairement indisponible.
-                </Text>
-                <Text style={styles.disabledMessageSubtext}>
-                  Veuillez utiliser le paiement en espèces pour vos transactions.
-                </Text>
-              </View>
-              <TouchableOpacity style={styles.saveButton} onPress={() => setModalVisible(false)}>
-                <Text style={styles.saveButtonText}>Fermer</Text>
-              </TouchableOpacity>
+          <Ionicons name="arrow-back" size={24} color="#fff" />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Moyens de Paiement</Text>
+        <View style={{ width: 40 }} />
+      </View>
+
+      <ScrollView 
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Main Info Card */}
+        <View style={styles.mainCard}>
+          <View style={styles.iconContainer}>
+            <Ionicons name="cash-outline" size={48} color="#FF6F00" />
+          </View>
+          <Text style={styles.mainTitle}>Paiement en Espèces</Text>
+          <Text style={styles.mainSubtitle}>
+            Actuellement, nous n'acceptons que les paiements en espèces pour vos courses.
+          </Text>
+        </View>
+
+        {/* Current Status Card */}
+        <View style={styles.statusCard}>
+          <View style={styles.statusHeader}>
+            <Ionicons name="information-circle" size={24} color="#FF6F00" />
+            <Text style={styles.statusTitle}>Statut Actuel</Text>
+          </View>
+          <Text style={styles.statusText}>
+            Les paiements par carte et les méthodes de paiement numériques ne sont pas encore disponibles dans votre région.
+          </Text>
+        </View>
+
+        {/* Future Features Card */}
+        <View style={styles.futureCard}>
+          <View style={styles.futureHeader}>
+            <Ionicons name="card-outline" size={24} color="#4CAF50" />
+            <Text style={styles.futureTitle}>Paiements Numériques</Text>
+          </View>
+          <Text style={styles.futureText}>
+            Les paiements numériques pourraient être disponibles selon votre chauffeur. Veuillez vérifier avec votre chauffeur au moment de la réservation.
+          </Text>
+          <View style={styles.featureList}>
+            <View style={styles.featureItem}>
+              <Ionicons name="checkmark-circle" size={16} color="#4CAF50" />
+              <Text style={styles.featureText}>Paiement par carte bancaire</Text>
             </View>
-          </ScrollView>
-        </KeyboardAvoidingView>
-      </Modal>
-    </View>
+            <View style={styles.featureItem}>
+              <Ionicons name="checkmark-circle" size={16} color="#4CAF50" />
+              <Text style={styles.featureText}>Paiement mobile</Text>
+            </View>
+            <View style={styles.featureItem}>
+              <Ionicons name="checkmark-circle" size={16} color="#4CAF50" />
+              <Text style={styles.featureText}>Transferts d'argent</Text>
+            </View>
+          </View>
+        </View>
+
+        {/* Tips Card */}
+        <View style={styles.tipsCard}>
+          <View style={styles.tipsHeader}>
+            <Ionicons name="bulb-outline" size={24} color="#FFC107" />
+            <Text style={styles.tipsTitle}>Conseils</Text>
+          </View>
+          <View style={styles.tipsList}>
+            <View style={styles.tipItem}>
+              <Ionicons name="ellipse" size={6} color="#FFC107" />
+              <Text style={styles.tipText}>Préparez l'argent avant votre course</Text>
+            </View>
+            <View style={styles.tipItem}>
+              <Ionicons name="ellipse" size={6} color="#FFC107" />
+              <Text style={styles.tipText}>Demandez le prix exact à votre chauffeur</Text>
+            </View>
+            <View style={styles.tipItem}>
+              <Ionicons name="ellipse" size={6} color="#FFC107" />
+              <Text style={styles.tipText}>Gardez de la monnaie pour faciliter le paiement</Text>
+            </View>
+          </View>
+        </View>
+
+        {/* Contact Support */}
+        <TouchableOpacity style={styles.supportButton}>
+          <LinearGradient
+            colors={['#FF6F00', '#FF8533']}
+            style={styles.supportGradient}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+          >
+            <Ionicons name="help-circle-outline" size={20} color="#fff" />
+            <Text style={styles.supportButtonText}>Contacter le Support</Text>
+          </LinearGradient>
+        </TouchableOpacity>
+      </ScrollView>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#121212', padding: 16 },
-  headerButton: { marginLeft: 15 },
-  loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  loadingText: { color: '#fff', fontSize: 16 },
-  currencyContainer: {
-    backgroundColor: '#2C2C2C',
-    borderRadius: 10,
-    padding: 12,
-    marginBottom: 16,
-    borderLeftWidth: 4,
-    borderLeftColor: '#FF6F00',
+  container: {
+    flex: 1,
+    backgroundColor: '#121212',
   },
-  currencyText: { color: '#fff', fontSize: 16, fontWeight: '600' },
-  currencyBadge: {
-    backgroundColor: '#FF6F00',
-    borderRadius: 6,
-    padding: 6,
-    alignSelf: 'flex-start',
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#333',
+  },
+  backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#2A2A2A',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#fff',
+    fontFamily: 'System',
+  },
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    padding: 20,
+    paddingBottom: 40,
+  },
+  mainCard: {
+    backgroundColor: '#1E1E1E',
+    borderRadius: 16,
+    padding: 24,
+    marginBottom: 20,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOpacity: 0.1,
+    shadowOffset: { width: 0, height: 4 },
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  iconContainer: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: 'rgba(255, 111, 0, 0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  mainTitle: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#fff',
+    textAlign: 'center',
+    marginBottom: 12,
+    fontFamily: 'System',
+  },
+  mainSubtitle: {
+    fontSize: 16,
+    color: '#B0B0B0',
+    textAlign: 'center',
+    lineHeight: 24,
+    fontFamily: 'System',
+  },
+  statusCard: {
+    backgroundColor: '#1E1E1E',
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOpacity: 0.1,
+    shadowOffset: { width: 0, height: 4 },
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  statusHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
     marginBottom: 12,
   },
-  currencyBadgeText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: 'bold',
-  },
-  testModeText: { color: '#fff', fontSize: 16, fontWeight: '600' },
-  emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', marginTop: 50 },
-  emptyText: { color: '#fff', fontSize: 18, fontWeight: 'bold', marginTop: 20, marginBottom: 10 },
-  emptySubtext: { color: '#b3b3b3', fontSize: 14, textAlign: 'center', maxWidth: '80%' },
-  listContent: { paddingBottom: 90 },
-  paymentMethodCard: { backgroundColor: '#2C2C2C', borderRadius: 15, padding: 16, marginBottom: 16 },
-  cardContent: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
-  cardIconContainer: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: '#1E1E1E',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 16,
-  },
-  cardDetails: { flex: 1 },
-  cardTitle: { color: '#fff', fontSize: 16, fontWeight: 'bold', marginBottom: 4 },
-  cardSubtitle: { color: '#b3b3b3', fontSize: 14 },
-  cardCurrency: { color: '#FF6F00', fontSize: 12, marginTop: 4 },
-  testBadge: {
-    position: 'absolute',
-    right: 0,
-    top: 0,
-    backgroundColor: '#FF6F00',
-    borderRadius: 4,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-  },
-  testBadgeText: { color: '#fff', fontSize: 10, fontWeight: 'bold' },
-  cardActions: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    borderTopWidth: 1,
-    borderTopColor: '#3C3C3C',
-    paddingTop: 12,
-  },
-  defaultButton: { flexDirection: 'row', alignItems: 'center' },
-  radioButton: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    borderWidth: 2,
-    borderColor: '#FF6F00',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 8,
-  },
-  radioButtonInner: { width: 10, height: 10, borderRadius: 5, backgroundColor: '#FF6F00' },
-  defaultText: { color: '#fff', fontSize: 14 },
-  deleteButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#3C3C3C',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  addButton: {
-    position: 'absolute',
-    bottom: 20,
-    left: 20,
-    right: 20,
-    backgroundColor: '#FF6F00',
-    borderRadius: 10,
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 15,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 5,
-  },
-  addButtonText: { color: '#fff', fontSize: 16, fontWeight: 'bold', marginLeft: 8 },
-  modalContainer: {
-    flex: 1,
-    justifyContent: 'flex-end',
-    backgroundColor: 'rgba(0,0,0,0.5)',
-  },
-  modalScrollContainer: {
-    flexGrow: 1,
-    justifyContent: 'flex-end',
-  },
-  modalContent: { backgroundColor: '#1E1E1E', borderTopLeftRadius: 25, borderTopRightRadius: 25, padding: 20 },
-  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
-  modalTitle: { color: '#fff', fontSize: 20, fontWeight: 'bold' },
-  cardInputContainer: { marginBottom: 20 },
-  cardField: { width: '100%', height: 50, marginVertical: 20 },
-  saveButton: { backgroundColor: '#FF6F00', borderRadius: 10, padding: 15, alignItems: 'center', marginTop: 20 },
-  saveButtonText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
-  disabledMessageContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 20,
-    marginVertical: 20,
-  },
-  disabledMessageText: {
-    color: '#fff',
+  statusTitle: {
     fontSize: 18,
-    fontWeight: 'bold',
-    textAlign: 'center',
-    marginTop: 10,
+    fontWeight: '600',
+    color: '#fff',
+    marginLeft: 8,
+    fontFamily: 'System',
   },
-  disabledMessageSubtext: {
-    color: '#b3b3b3',
+  statusText: {
+    fontSize: 15,
+    color: '#B0B0B0',
+    lineHeight: 22,
+    fontFamily: 'System',
+  },
+  futureCard: {
+    backgroundColor: '#1E1E1E',
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOpacity: 0.1,
+    shadowOffset: { width: 0, height: 4 },
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  futureHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  futureTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#fff',
+    marginLeft: 8,
+    fontFamily: 'System',
+  },
+  futureText: {
+    fontSize: 15,
+    color: '#B0B0B0',
+    lineHeight: 22,
+    marginBottom: 16,
+    fontFamily: 'System',
+  },
+  featureList: {
+    marginTop: 8,
+  },
+  featureItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  featureText: {
     fontSize: 14,
-    textAlign: 'center',
-    marginTop: 5,
+    color: '#B0B0B0',
+    marginLeft: 8,
+    fontFamily: 'System',
+  },
+  tipsCard: {
+    backgroundColor: '#1E1E1E',
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 24,
+    shadowColor: '#000',
+    shadowOpacity: 0.1,
+    shadowOffset: { width: 0, height: 4 },
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  tipsHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  tipsTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#fff',
+    marginLeft: 8,
+    fontFamily: 'System',
+  },
+  tipsList: {
+    marginTop: 8,
+  },
+  tipItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  tipText: {
+    fontSize: 14,
+    color: '#B0B0B0',
+    marginLeft: 12,
+    flex: 1,
+    lineHeight: 20,
+    fontFamily: 'System',
+  },
+  supportButton: {
+    borderRadius: 12,
+    overflow: 'hidden',
+    shadowColor: '#FF6F00',
+    shadowOpacity: 0.3,
+    shadowOffset: { width: 0, height: 4 },
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  supportGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+  },
+  supportButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+    marginLeft: 8,
+    fontFamily: 'System',
   },
 });
 
-export { PaymentMethodsScreen };
+export default PaymentMethodsScreen; 

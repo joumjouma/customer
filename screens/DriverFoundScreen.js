@@ -15,6 +15,7 @@ import {
   Alert,
   Modal,
   SafeAreaView,
+  PanResponder,
 } from "react-native";
 import MapView, { Marker, PROVIDER_DEFAULT } from "react-native-maps";
 import MapViewDirections from "react-native-maps-directions";
@@ -29,11 +30,12 @@ import { BlurView } from "expo-blur";
 import MessageButton from "../components/MessageButton";
 import { getAuth } from "firebase/auth";
 import { createDriverCustomerConversation } from '../utils/conversation';
+import { sendWhatsAppMessage } from '../utils/whatsapp';
 
 const { height, width } = Dimensions.get("window");
 
 // Define overlay heights
-const COLLAPSED_HEIGHT = 250;
+const COLLAPSED_HEIGHT = 320;
 const EXPANDED_HEIGHT = height * 0.6;
 
 // Modern dark map style with orange accents
@@ -83,6 +85,24 @@ const THEME = {
   overlay: "rgba(18,18,18,0.9)",
 };
 
+function getRankLabel(rating) {
+  if (rating >= 5) return 'Platinum';
+  if (rating >= 4.5) return 'Diamond';
+  if (rating >= 4) return 'Gold';
+  if (rating >= 3) return 'Silver';
+  if (rating >= 2) return 'Bronze';
+  return 'Unranked';
+}
+
+function getRankBadgeStyle(rating) {
+  if (rating >= 5) return { backgroundColor: '#b3e5fc', borderWidth: 1, borderColor: '#00bcd4' };
+  if (rating >= 4.5) return { backgroundColor: '#e1bee7', borderWidth: 1, borderColor: '#7c4dff' };
+  if (rating >= 4) return { backgroundColor: '#ffd700', borderWidth: 1, borderColor: '#bfa100' };
+  if (rating >= 3) return { backgroundColor: '#cfd8dc', borderWidth: 1, borderColor: '#90a4ae' };
+  if (rating >= 2) return { backgroundColor: '#bcaaa4', borderWidth: 1, borderColor: '#8d6e63' };
+  return { backgroundColor: '#888', borderWidth: 1, borderColor: '#555' };
+}
+
 const DriverFoundScreen = () => {
   const route = useRoute();
   const navigation = useNavigation();
@@ -90,13 +110,6 @@ const DriverFoundScreen = () => {
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const overlayHeightAnim = useRef(new Animated.Value(COLLAPSED_HEIGHT)).current;
   const headerOpacityAnim = useRef(new Animated.Value(0)).current;
-
-  // Set a random ETA between 5 and 12 minutes
-  const [randomETA, setRandomETA] = useState(5);
-  useEffect(() => {
-    const eta = Math.floor(Math.random() * (12 - 5 + 1)) + 5;
-    setRandomETA(eta);
-  }, []);
 
   const {
     rideType,
@@ -117,6 +130,7 @@ const DriverFoundScreen = () => {
     pickupLng,
     rideId,
     fare,
+    customerPhone, // Extract from params
   } = route.params || {};
 
   const [mapRegion, setMapRegion] = useState(null);
@@ -140,6 +154,39 @@ const DriverFoundScreen = () => {
   const [userDriverRating, setUserDriverRating] = useState(0);
   const [selectedComments, setSelectedComments] = useState([]);
   const [showRatingModal, setShowRatingModal] = useState(false);
+  const [carColor, setCarColor] = useState("");
+  const [carModel, setCarModel] = useState("");
+  const [carMake, setCarMake] = useState("");
+  const [plaqueImmatriculation, setPlaqueImmatriculation] = useState("");
+  const [driverRatingValue, setDriverRatingValue] = useState(null);
+  const [driverArrived, setDriverArrived] = useState(false);
+  const [showDriverArrivedMessage, setShowDriverArrivedMessage] = useState(false);
+  const [customerPickedUp, setCustomerPickedUp] = useState(false);
+  const [showOnRouteMessage, setShowOnRouteMessage] = useState(false);
+  const [driverPaymentMethods, setDriverPaymentMethods] = useState({});
+
+  // Fetch car details from Firestore
+  useEffect(() => {
+    if (!driverId) return;
+    const fetchCarDetails = async () => {
+      try {
+        const driverDocRef = doc(firestore, "Drivers", driverId);
+        const driverDoc = await getDoc(driverDocRef);
+        if (driverDoc.exists()) {
+          const data = driverDoc.data();
+          setCarColor(data.carColor || "");
+          setCarModel(data.carModel || "");
+          setCarMake(data.carMake || "");
+          setPlaqueImmatriculation(data.plaqueImmatriculation || "");
+          setDriverRatingValue(data.rating || data.averageRating || null);
+          setDriverPaymentMethods(data.paymentMethods || {});
+        }
+      } catch (error) {
+        console.log("Error fetching car details:", error);
+      }
+    };
+    fetchCarDetails();
+  }, [driverId]);
 
   const mapRef = useRef(null);
   const pulseAnimationRef = useRef(null);
@@ -149,25 +196,132 @@ const DriverFoundScreen = () => {
   useEffect(() => {
     if (!rideId) return;
 
+    console.log('🎯 Setting up ride status listener for rideId:', rideId);
+    
     const rideRequestRef = doc(firestore, "rideRequests", rideId);
-    const unsubscribe = onSnapshot(rideRequestRef, (docSnap) => {
+    const unsubscribe = onSnapshot(rideRequestRef, async (docSnap) => {
       if (docSnap.exists()) {
         const data = docSnap.data();
-        setRideStatus(data.status);
+        const currentStatus = data.status;
+        console.log('🔄 Ride status changed:', currentStatus, 'Data:', data);
+        setRideStatus(currentStatus);
+        
+        // Check if driver has arrived at pickup location
+        if (data.driverArrivedAtPickup || currentStatus === "driver_arrived" || currentStatus === "arrived_at_pickup") {
+          console.log('✅ Driver arrived detected, showing notification');
+          setDriverArrived(true);
+          setShowDriverArrivedMessage(true);
+          // Send WhatsApp message to user
+          try {
+            if (customerPhone) {
+              const phone = customerPhone.startsWith('+') ? customerPhone : `+${customerPhone}`;
+              console.log('About to send WhatsApp message to', phone);
+              await sendWhatsAppMessage(phone, "Votre chauffeur est arrivé à votre point de départ.");
+              console.log('WhatsApp message sent (or attempted)');
+            }
+          } catch (err) {
+            console.error('Erreur lors de l\'envoi du message WhatsApp (driver arrived):', err);
+          }
+          // Do NOT auto-hide the message anymore
+        }
+        
+        // Check if customer has been picked up
+        if ((data.customerPickedUp || data.status === "picked_up") && !customerPickedUp) {
+          console.log('✅ Customer picked up detected (by status or flag)');
+          setCustomerPickedUp(true);
+          // No on-route notification/banner, only update state
+        }
+        
         // Transition to destination phase if customer is picked up
-        if (data.customerPickedUp) {
+        if (data.customerPickedUp || data.status === "picked_up") {
           setTripPhase('to-destination');
         } else {
           setTripPhase('pickup');
         }
-        // If ride is completed, show fare modal and navigate to HomeTabs
-        if (data.status === "completed") {
+        
+        // COMPREHENSIVE STATUS HANDLING WITH LOGGING
+        console.log('📊 Processing ride status:', currentStatus);
+        console.log('📊 Current trip phase:', tripPhase);
+        console.log('📊 Driver arrived state:', driverArrived);
+        console.log('📊 Customer picked up state:', customerPickedUp);
+        
+        // Only show fare modal for completed rides, but don't navigate
+        if (currentStatus === "completed") {
+          console.log('🎉 Ride completed, showing fare modal');
           setShowFareModal(true);
+        } else {
+          console.log('🔄 Ride continuing with status:', currentStatus, '- NO NAVIGATION ALLOWED');
         }
+      } else {
+        console.log('⚠️ Ride document does not exist');
       }
     });
 
-    return () => unsubscribe();
+    return () => {
+      console.log('🎯 Cleaning up ride status listener');
+      unsubscribe();
+    };
+  }, [rideId, navigation, customerPickedUp]);
+
+  // Global safety check to prevent unwanted navigation
+  useEffect(() => {
+    // TARGETED NAVIGATION PROTECTION
+    console.log('🛡️ Setting up targeted navigation protection');
+    
+    if (rideId) {
+      console.log('🛡️ Ride is active, protecting navigation');
+      
+      // Store original navigation methods
+      const originalNavigate = navigation.navigate;
+      const originalReplace = navigation.replace;
+      
+      // Override navigation methods to prevent unwanted navigation
+      navigation.navigate = (...args) => {
+        console.log('🚫 NAVIGATION ATTEMPT:', 'navigate', args);
+        // Allow navigation to ActivityScreen via HomeTabs
+        if (
+          (args[0] === 'HomeTabs' && args[1]?.screen === 'ActivityScreen')
+        ) {
+          console.log('✅ Allowing navigation to ActivityScreen via HomeTabs');
+          return originalNavigate.apply(navigation, args);
+        }
+        // Block navigation to HomeTabs or Home in other cases
+        if (args[0] === 'HomeTabs' || args[0] === 'Home') {
+          console.log('❌ BLOCKING navigation to:', args[0], '- Ride is active');
+          return;
+        }
+        // Allow navigation to specific screens
+        const allowedScreens = ['CustomerInboxScreen'];
+        if (allowedScreens.includes(args[0])) {
+          console.log('✅ Allowing navigation to:', args[0]);
+          return originalNavigate.apply(navigation, args);
+        }
+        // Allow other navigation
+        console.log('✅ Allowing navigation to:', args[0]);
+        return originalNavigate.apply(navigation, args);
+      };
+      
+      navigation.replace = (...args) => {
+        console.log('🚫 REPLACE ATTEMPT:', 'replace', args);
+        
+        // Block replacement to HomeTabs or other screens that might interfere
+        if (args[0] === 'HomeTabs' || args[0] === 'Home') {
+          console.log('❌ BLOCKING replace to:', args[0], '- Ride is active');
+          return;
+        }
+        
+        // Allow other replacements
+        console.log('✅ Allowing replace to:', args[0]);
+        return originalReplace.apply(navigation, args);
+      };
+      
+      // Restore original navigation when component unmounts
+      return () => {
+        console.log('🛡️ Restoring original navigation methods');
+        navigation.navigate = originalNavigate;
+        navigation.replace = originalReplace;
+      };
+    }
   }, [rideId, navigation]);
 
   // Start entry and pulse animations
@@ -368,7 +522,7 @@ const DriverFoundScreen = () => {
   };
 
   const shareRide = () => {
-    const message = `Je suis en route vers ${destinationData?.address || "ma destination"} avec Caval. Mon chauffeur ${driverName || "est en route"} arrivera dans environ ${randomETA} minutes.`;
+    const message = `Je suis en route vers ${destinationData?.address || "ma destination"} avec Caval. Mon chauffeur ${driverName || "est en route"} arrivera dans environ ${driverEtaToCustomer ? Math.ceil(driverEtaToCustomer) : 5} minutes.`;
     if (Platform.OS === "ios") {
       Linking.openURL(`sms:&body=${encodeURIComponent(message)}`);
     } else {
@@ -386,12 +540,12 @@ const DriverFoundScreen = () => {
         toValue: newHeight,
         tension: 20,
         friction: 7,
-        useNativeDriver: false,
+        useNativeDriver: false, // Must be false for height
       }),
       Animated.timing(headerOpacityAnim, {
         toValue: newHeaderOpacity,
         duration: 200,
-        useNativeDriver: false,
+        useNativeDriver: true, // Opacity can use native driver
       }),
     ]).start();
 
@@ -412,7 +566,7 @@ const DriverFoundScreen = () => {
   };
 
   const handleBackPress = () => {
-    navigation.goBack();
+    navigation.navigate('HomeTabs', { screen: 'ActivityScreen' });
   };
 
   const handleCancelRide = async (reason) => {
@@ -427,10 +581,8 @@ const DriverFoundScreen = () => {
         cancellationReason: reason
       });
       
-      // Navigate back to home screen
-      navigation.navigate('HomeTabs', {
-        screen: 'Home'
-      });
+      // Navigate to ActivityScreen tab
+      navigation.navigate('HomeTabs', { screen: 'ActivityScreen' });
     } catch (error) {
       console.error("Error cancelling ride:", error);
       Alert.alert(
@@ -490,21 +642,7 @@ const DriverFoundScreen = () => {
         {
           text: "OK",
           onPress: () => {
-            navigation.dispatch(
-              CommonActions.reset({
-                index: 0,
-                routes: [
-                  { 
-                    name: 'HomeTabs',
-                    state: {
-                      routes: [
-                        { name: 'Home' }
-                      ]
-                    }
-                  }
-                ],
-              })
-            );
+            navigation.navigate('HomeTabs', { screen: 'ActivityScreen' });
           }
         }
       ]);
@@ -544,6 +682,43 @@ const DriverFoundScreen = () => {
     }
   };
 
+  // Function to render payment methods
+  const renderPaymentMethods = () => {
+    if (!driverPaymentMethods || Object.keys(driverPaymentMethods).length === 0) {
+      return null;
+    }
+
+    const acceptedMethods = Object.entries(driverPaymentMethods)
+      .filter(([method, accepted]) => accepted)
+      .map(([method]) => method);
+
+    if (acceptedMethods.length === 0) {
+      return null;
+    }
+
+    return (
+      <View style={styles.paymentMethodsContainer}>
+        <View style={styles.paymentMethodsHeader}>
+          <Ionicons name="card" size={16} color={THEME.primary} style={{ marginRight: 6 }} />
+          <Text style={styles.paymentMethodsTitle}>Moyens de paiement acceptés</Text>
+        </View>
+        <View style={styles.paymentMethodsList}>
+          {acceptedMethods.map((method, index) => (
+            <View key={method} style={styles.paymentMethodChip}>
+              <Text style={styles.paymentMethodText}>
+                {method === 'cacpay' ? 'CacPay' : 
+                 method === 'dmoney' ? 'DMoney' : 
+                 method === 'sabapay' ? 'SabaPay' : 
+                 method === 'waafi' ? 'Waafi' : 
+                 method.charAt(0).toUpperCase() + method.slice(1)}
+              </Text>
+            </View>
+          ))}
+        </View>
+      </View>
+    );
+  };
+
   useEffect(() => {
     if (tripPhase === 'to-destination') {
       setShowOnTheWayMessage(true);
@@ -551,6 +726,18 @@ const DriverFoundScreen = () => {
       return () => clearTimeout(timer);
     }
   }, [tripPhase]);
+
+  // Zoom to driver location when driverArrived is true
+  useEffect(() => {
+    if (driverArrived && driverLocation && mapRef.current) {
+      mapRef.current.animateToRegion({
+        latitude: driverLocation.latitude,
+        longitude: driverLocation.longitude,
+        latitudeDelta: 0.002,
+        longitudeDelta: 0.002,
+      }, 800);
+    }
+  }, [driverArrived, driverLocation]);
 
   if (!mapRegion) {
     return (
@@ -590,6 +777,7 @@ const DriverFoundScreen = () => {
           showsTraffic={false}
           toolbarEnabled={false}
         >
+          {/* Show only driver to pickup route during pickup phase */}
           {driverLocation && origin && tripPhase === "pickup" && (
             <MapViewDirections
               origin={driverLocation}
@@ -601,9 +789,10 @@ const DriverFoundScreen = () => {
               onReady={handleDriverRouteReady}
             />
           )}
-          {origin && destinationData && (
+          {/* Show route to destination only after pickup */}
+          {origin && destinationData && tripPhase !== "pickup" && (
             <MapViewDirections
-              origin={tripPhase === "pickup" ? origin : driverLocation}
+              origin={driverLocation}
               destination={destinationData}
               apikey={GOOGLE_MAPS_APIKEY}
               strokeWidth={4}
@@ -612,7 +801,6 @@ const DriverFoundScreen = () => {
               onReady={handleCustomerRouteReady}
             />
           )}
-          
           {/* User location marker */}
           {userLocation && (
             <Marker coordinate={userLocation} anchor={{ x: 0.5, y: 0.5 }} tracksViewChanges={false}>
@@ -622,8 +810,7 @@ const DriverFoundScreen = () => {
               </View>
             </Marker>
           )}
-          
-          {/* Origin marker */}
+          {/* Origin marker (pickup) */}
           {origin && (
             <Marker 
               identifier="origin"
@@ -632,7 +819,7 @@ const DriverFoundScreen = () => {
               tracksViewChanges={false}
               zIndex={1000}
             >
-              <View style={[styles.originMarkerContainer, { elevation: 5 }]}>
+              <View style={[styles.originMarkerContainer, { elevation: 5 }]}> 
                 <View style={[styles.originMarkerDot, { elevation: 5 }]} />
                 <Text style={[styles.markerAddressPill, { elevation: 5 }]} numberOfLines={1}>
                   {originAddress || "Départ"}
@@ -640,9 +827,8 @@ const DriverFoundScreen = () => {
               </View>
             </Marker>
           )}
-          
-          {/* Destination marker */}
-          {(destinationData || destination) && (
+          {/* Destination marker only after pickup */}
+          {(destinationData || destination) && tripPhase !== "pickup" && (
             <Marker 
               identifier="destination"
               coordinate={destinationData || destination} 
@@ -652,9 +838,8 @@ const DriverFoundScreen = () => {
               zIndex={1000}
             />
           )}
-          
           {/* Driver marker */}
-          {driverLocation && (
+          {driverLocation && tripPhase === "pickup" && (
             <Marker 
               coordinate={driverLocation} 
               title="Driver"
@@ -672,9 +857,8 @@ const DriverFoundScreen = () => {
               </View>
             </Marker>
           )}
-          
-          {/* Fallback driver marker if no driver location but we have driver data */}
-          {!driverLocation && driverId && (
+          {/* Fallback driver marker if no driver location but we have driver data - only show during pickup phase */}
+          {!driverLocation && driverId && tripPhase === "pickup" && (
             <Marker 
               coordinate={{ latitude: 11.5890, longitude: 43.1450 }} 
               title="Driver"
@@ -693,6 +877,9 @@ const DriverFoundScreen = () => {
           )}
         </MapView>
 
+        {/* Background patch to cover bottom gap, now behind overlay */}
+        {!expandedOverlay && <View style={styles.backgroundPatch} />}
+
         {/* Top Controls */}
         <View style={styles.topControls}>
           <TouchableOpacity style={styles.backButton} onPress={handleBackPress}>
@@ -702,7 +889,7 @@ const DriverFoundScreen = () => {
           <View style={styles.statusPill}>
             <View style={[styles.statusDot, { backgroundColor: THEME.primary }]} />
             <Text style={styles.statusText}>
-              {tripPhase === "pickup" ? "Chauffeur en approche" : "En route"}
+              {driverArrived ? "Chauffeur arrivé" : (tripPhase === "pickup" ? "Chauffeur en approche" : tripPhase === "to-destination" ? "En route vers la destination" : "")}
             </Text>
           </View>
           
@@ -722,60 +909,129 @@ const DriverFoundScreen = () => {
           </TouchableOpacity>
         </View>
 
-        {/* ETA Card */}
-        <View style={styles.etaCard}>
-          <View style={styles.etaContent}>
-            <View style={styles.etaPulse}>
-              <Animated.View style={[styles.etaPulseDot, { transform: [{ scale: pulseAnim }] }]} />
+        {/* ETA Card: Only show during pickup phase and before driverArrived and not after picked up */}
+        {!driverArrived && tripPhase === 'pickup' && !customerPickedUp && driverEtaToCustomer && (
+          <View style={styles.etaCard}>
+            <View style={styles.etaContent}>
+              <View style={styles.etaPulse}>
+                <Animated.View style={[styles.etaPulseDot, { transform: [{ scale: pulseAnim }] }]} />
+              </View>
+              <View>
+                <Text style={styles.etaTitle}>Arrivée estimée</Text>
+                <Text style={styles.etaValue}>{Math.ceil(driverEtaToCustomer)} min</Text>
+              </View>
             </View>
-            <View>
-              <Text style={styles.etaTitle}>Arrivée estimée</Text>
-              <Text style={styles.etaValue}>{randomETA} min</Text>
-            </View>
-          </View>
-        </View>
-
-        {/* Notification about driver arrival - moved to top */}
-        {tripPhase === 'pickup' && (
-          <View style={styles.topNotificationContainer}>
-            <View style={styles.notificationIconContainer}>
-              <Ionicons name="notifications" size={16} color={THEME.primary} />
-            </View>
-            <Text style={styles.notificationText}>
-              Vous serez contacté lorsque le chauffeur arrivera
-            </Text>
           </View>
         )}
-        {/* Customer is on the way notification */}
-        {tripPhase === 'to-destination' && showOnTheWayMessage && (
-          <View style={[styles.topNotificationContainer, { backgroundColor: '#e6f7ff', borderColor: THEME.primary, borderWidth: 1 }]}> 
-            <View style={styles.notificationIconContainer}>
-              <Ionicons name="car" size={16} color={THEME.primary} />
+
+        {/* Notification about driver arrival - moved to top */}
+        {driverArrived && tripPhase === 'pickup' && (
+          <Animated.View style={{
+            position: 'absolute',
+            top: Platform.OS === 'ios' ? 120 : 100,
+            left: '10%',
+            right: '10%',
+            backgroundColor: '#fff',
+            borderColor: THEME.success,
+            borderWidth: 1.5,
+            borderRadius: 16,
+            shadowColor: '#000',
+            shadowOpacity: 0.10,
+            shadowRadius: 10,
+            elevation: 8,
+            alignItems: 'center',
+            paddingVertical: 18,
+            paddingHorizontal: 18,
+            zIndex: 1000,
+          }}>
+            <View style={{ alignItems: 'center', marginBottom: 8 }}>
+              <Ionicons name="checkmark-circle" size={30} color={THEME.success} style={{ marginBottom: 2 }} />
+              <Text style={{ color: THEME.success, fontWeight: '700', fontSize: 18, textAlign: 'center', marginBottom: 2 }}>Votre chauffeur est arrivé !</Text>
+              <Text style={{ color: THEME.success, fontSize: 15, textAlign: 'center', fontWeight: '500' }}>Veuillez sortir pour le retrouver.</Text>
             </View>
-            <Text style={[styles.notificationText, { color: THEME.primary }]}>Vous êtes en route vers votre destination !</Text>
-          </View>
+            <View style={{ height: 1, backgroundColor: '#e0e0e0', width: '100%', marginVertical: 10 }} />
+            <Text style={{ color: THEME.success, fontWeight: '600', fontSize: 15, textAlign: 'center', marginBottom: 6 }}>
+              Véhicule : {carMake} {carModel} {carColor && `(${carColor})`} {plaqueImmatriculation && `- Plaque: ${plaqueImmatriculation}`}
+            </Text>
+            <View style={{ flexDirection: 'row', marginTop: 6, justifyContent: 'center' }}>
+              <TouchableOpacity
+                style={{ backgroundColor: THEME.primary, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 18, paddingVertical: 10, borderRadius: 8 }}
+                onPress={() => {
+                  if (driverPhone) {
+                    const message = encodeURIComponent('Bonjour, je suis votre client Caval. Je vous contacte concernant ma course.');
+                    const phone = driverPhone.replace(/\D/g, '');
+                    const url = `https://wa.me/${phone}?text=${message}`;
+                    Linking.openURL(url);
+                  }
+                }}
+              >
+                <Ionicons name="logo-whatsapp" size={20} color="#fff" />
+                <Text style={{ color: '#fff', fontWeight: '600', marginLeft: 8, fontSize: 15 }}>WhatsApp (Message/Appel)</Text>
+              </TouchableOpacity>
+            </View>
+          </Animated.View>
         )}
 
         {/* Bottom Sheet Overlay */}
-        <Animated.View style={[styles.overlayContainer, { height: overlayHeightAnim }]}>
+        <Animated.View style={[ 
+          styles.overlayContainer, 
+          { height: overlayHeightAnim }, 
+          { marginBottom: expandedOverlay ? 0 : 60 },
+        ]}>
           <View style={styles.overlay}>
             <View style={styles.pullIndicator} />
             
             {/* Always-visible driver info section */}
             <View style={styles.driverInfoContainer}>
               <View style={styles.driverImageWrapper}>
+                <Text style={styles.driverNameAbove}>{driverName || "Votre chauffeur"}</Text>
                 <Image
                   source={driverPhoto ? { uri: driverPhoto } : require("../assets/driver_placeholder.png")}
                   style={styles.driverImage}
                 />
-                <View style={styles.ratingContainer}>
-                  <Text style={styles.ratingText}>{driverRating}</Text>
-                  <Ionicons name="star" size={10} color="#FFD700" />
-                </View>
               </View>
-              
               <View style={styles.driverDetails}>
-                <Text style={styles.driverName}>{driverName || "Votre chauffeur"}</Text>
+                {/* Car details for identification - professional and aesthetic */}
+                {(carColor || carModel || carMake) && (
+                  <View style={styles.carInfoContainerRow}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+                      <Ionicons name="car-sport" size={20} color={THEME.primary} style={{ marginRight: 8 }} />
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.carInfoText}>
+                          <Text style={styles.carInfoMakeModel}>{carMake} {carModel}</Text>
+                        </Text>
+                        {carColor && (
+                          <View style={styles.carColorRow}>
+                            <View style={[styles.carColorDot, { backgroundColor: carColor.toLowerCase() === 'blanc' ? '#fff' : carColor.toLowerCase() === 'noir' ? '#222' : carColor.toLowerCase() === 'gris' ? '#888' : carColor.toLowerCase() === 'rouge' ? '#d32f2f' : carColor.toLowerCase() === 'bleu' ? '#1976d2' : carColor.toLowerCase() === 'vert' ? '#388e3c' : '#ccc' }]} />
+                            <Text style={styles.carColorLabel}>{carColor}</Text>
+                          </View>
+                        )}
+                        {plaqueImmatriculation && (
+                          <View style={styles.plateRow}>
+                            <Text style={styles.plateLabel}>Plaque :</Text>
+                            <View style={styles.plateBox}>
+                              <Text style={styles.plateText}>{plaqueImmatriculation}</Text>
+                            </View>
+                          </View>
+                        )}
+                      </View>
+                    </View>
+                    {/* Rating and Rank on the right */}
+                    {(driverRatingValue || driverRatingValue === 0) && (
+                      <View style={styles.ratingRankColumn}>
+                        <View style={styles.ratingBoxRight}>
+                          <Ionicons name="star" size={15} color="#FFD700" style={{ marginRight: 2 }} />
+                          <Text style={styles.ratingValue}>{parseFloat(driverRatingValue).toFixed(1)}</Text>
+                        </View>
+                        <View style={[styles.rankBadge, getRankBadgeStyle(driverRatingValue)]}>
+                          <Text style={styles.rankBadgeText}>{getRankLabel(driverRatingValue)}</Text>
+                        </View>
+                      </View>
+                    )}
+                  </View>
+                )}
+                {/* Payment Methods */}
+                {renderPaymentMethods()}
                 <View style={styles.rideInfoContainer}>
                   <Text style={styles.rideType}>{rideType || "Premium"}</Text>
                 </View>
@@ -799,50 +1055,24 @@ const DriverFoundScreen = () => {
             </View>
             
             {/* Action Buttons */}
-            <View style={styles.actionButtons}>
+            <View style={[styles.actionButtons, { flexWrap: 'wrap', justifyContent: 'space-between' }]}> 
+              {/* Only show the WhatsApp message button for contact */}
               <TouchableOpacity 
-                style={[styles.actionButton, styles.callButton]}
-                onPress={handleCallDriver}
-              >
-                <Ionicons name="call" size={20} color="#fff" />
-                <Text style={styles.actionButtonText}>Appeler</Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity 
-                style={styles.actionButton}
+                style={[styles.actionButton, { flex: 1, marginHorizontal: 4, minWidth: 120, maxWidth: 180 }]}
                 onPress={async () => {
-                  try {
-                    const auth = getAuth();
-                    const currentUser = auth.currentUser;
-                    
-                    if (!currentUser || !driverId) {
-                      Alert.alert("Error", "Unable to start conversation");
-                      return;
-                    }
-
-                    // Create or get the conversation
-                    const conversationId = await createDriverCustomerConversation(driverId, currentUser.uid);
-                    
-                    // Navigate to InboxScreen with the conversation details
-                    navigation.navigate('CustomerInboxScreen', {
-                      conversationId,
-                      driverId,
-                      driverName,
-                      driverPhoto,
-                      rideId
-                    });
-                  } catch (error) {
-                    console.error('Error starting conversation:', error);
-                    Alert.alert("Error", "Failed to start conversation");
+                  if (driverPhone) {
+                    const message = encodeURIComponent('Bonjour, je suis votre client Caval. Je vous contacte concernant ma course.');
+                    const phone = driverPhone.replace(/\D/g, '');
+                    const url = `https://wa.me/${phone}?text=${message}`;
+                    Linking.openURL(url);
                   }
                 }}
               >
-                <Ionicons name="chatbubble-ellipses" size={20} color="#fff" />
-                <Text style={styles.actionButtonText}>Message</Text>
+                <Ionicons name="logo-whatsapp" size={20} color="#fff" />
+                <Text style={styles.actionButtonText}>WhatsApp (Message/Appel)</Text>
               </TouchableOpacity>
-              
               <TouchableOpacity 
-                style={styles.actionButton}
+                style={[styles.actionButton, { flex: 1, marginHorizontal: 4, minWidth: 120, maxWidth: 180 }]}
                 onPress={() => setShowHelpModal(true)}
               >
                 <Ionicons name="help-circle" size={20} color={THEME.warning} />
@@ -876,6 +1106,7 @@ const DriverFoundScreen = () => {
                 ref={scrollRef}
                 style={styles.expandedScroll}
                 showsVerticalScrollIndicator={false}
+                contentContainerStyle={{ paddingBottom: 32 }}
               >
                 {/* Trip Details */}
                 <View style={styles.tripDetailsContainer}>
@@ -971,6 +1202,7 @@ const DriverFoundScreen = () => {
                 </View>
               </ScrollView>
             </Animated.View>
+            <View style={styles.bottomSpacerSmall} />
           </View>
         </Animated.View>
         
@@ -1086,107 +1318,122 @@ const DriverFoundScreen = () => {
             left: 0,
             right: 0,
             bottom: 0,
-            backgroundColor: 'rgba(0,0,0,0.7)',
+            backgroundColor: 'rgba(0,0,0,0.75)',
             justifyContent: 'center',
             alignItems: 'center',
             zIndex: 9999,
           }}>
-            <View style={{
-              backgroundColor: '#fff',
-              borderRadius: 20,
-              padding: 32,
-              alignItems: 'center',
-              shadowColor: '#000',
-              shadowOpacity: 0.3,
-              shadowRadius: 10,
-              elevation: 10,
-              maxWidth: '90%',
-              maxHeight: '80%',
-            }}>
-              <Ionicons name="cash" size={48} color={THEME.primary} style={{ marginBottom: 16 }} />
-              <Text style={{ fontSize: 22, fontWeight: 'bold', color: THEME.primary, marginBottom: 12 }}>Trajet terminé</Text>
-              <Text style={{ fontSize: 18, color: '#222', marginBottom: 8 }}>Veuillez régler le montant suivant :</Text>
-              <Text style={{ fontSize: 32, fontWeight: 'bold', color: THEME.primary, marginBottom: 20 }}>{fare ? `${fare} FDJ` : '-- FDJ'}</Text>
-              
-              {/* Rating Section */}
-              <View style={styles.ratingSection}>
-                <Text style={styles.ratingTitle}>Évaluez votre chauffeur</Text>
-                <View style={styles.starsContainer}>
-                  {[1, 2, 3, 4, 5].map((star) => (
-                    <TouchableOpacity
-                      key={star}
-                      onPress={() => setUserDriverRating(star)}
-                      style={styles.starButton}
-                    >
-                      <Ionicons
-                        name={userDriverRating >= star ? "star" : "star-outline"}
-                        size={32}
-                        color={userDriverRating >= star ? "#FFD700" : "#ccc"}
-                      />
-                    </TouchableOpacity>
-                  ))}
+            <LinearGradient
+              colors={[THEME.background, '#232323', '#181818']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={{
+                borderRadius: 36,
+                padding: 0,
+                alignItems: 'center',
+                shadowColor: '#000',
+                shadowOpacity: 0.25,
+                shadowRadius: 18,
+                elevation: 18,
+                maxWidth: '92%',
+                maxHeight: '85%',
+                width: 370,
+                minWidth: 320,
+                overflow: 'hidden',
+              }}
+            >
+              <View style={{
+                backgroundColor: THEME.card,
+                borderRadius: 36,
+                paddingVertical: 36,
+                paddingHorizontal: 28,
+                alignItems: 'center',
+                width: '100%',
+                shadowColor: '#000',
+                shadowOpacity: 0.10,
+                shadowRadius: 10,
+                elevation: 10,
+              }}>
+                <Ionicons name="cash" size={54} color={THEME.primary} style={{ marginBottom: 18, backgroundColor: '#fff', borderRadius: 27, padding: 6, shadowColor: THEME.primary, shadowOpacity: 0.12, shadowRadius: 8, elevation: 6 }} />
+                <Text style={{ fontSize: 26, fontWeight: '800', color: THEME.primary, marginBottom: 10, letterSpacing: 0.5 }}>Trajet terminé</Text>
+                <Text style={{ fontSize: 19, color: THEME.textSecondary, marginBottom: 8, fontWeight: '600' }}>Veuillez régler le montant suivant :</Text>
+                <View style={{
+                  backgroundColor: 'rgba(255,107,0,0.08)',
+                  borderRadius: 18,
+                  paddingHorizontal: 28,
+                  paddingVertical: 10,
+                  marginBottom: 24,
+                  marginTop: 2,
+                }}>
+                  <Text style={{ fontSize: 36, fontWeight: '800', color: THEME.primary, letterSpacing: 1 }}>{fare ? `${fare} FDJ` : '-- FDJ'}</Text>
+                </View>
+                {/* Rating Section */}
+                <View style={[styles.ratingSection, { marginTop: 10, marginBottom: 10 }]}>
+                  <Text style={[styles.ratingTitle, { color: THEME.text, fontSize: 20, marginBottom: 18 }]}>Évaluez votre chauffeur</Text>
+                  <View style={styles.starsContainer}>
+                    {[1, 2, 3, 4, 5].map((star) => (
+                      <TouchableOpacity
+                        key={star}
+                        onPress={() => setUserDriverRating(star)}
+                        style={styles.starButton}
+                      >
+                        <Ionicons
+                          name={userDriverRating >= star ? "star" : "star-outline"}
+                          size={38}
+                          color={userDriverRating >= star ? "#FFD700" : "#ccc"}
+                          style={{ marginHorizontal: 2 }}
+                        />
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                  
+                  {userDriverRating > 0 && (
+                    <View style={styles.commentsSection}>
+                      <Text style={[styles.commentsTitle, { color: THEME.text, fontWeight: '700', fontSize: 15, marginBottom: 10 }] }>
+                        {userDriverRating <= 3 ? "Que s'est-il mal passé ?" : "Qu'avez-vous apprécié ?"}
+                      </Text>
+                      <View style={styles.commentsGrid}>
+                        {getCommentSuggestions(userDriverRating).map((comment) => (
+                          <TouchableOpacity
+                            key={comment}
+                            style={[
+                              styles.commentChip,
+                              selectedComments.includes(comment) && styles.commentChipSelected,
+                              { borderRadius: 16, paddingVertical: 8, paddingHorizontal: 14, margin: 3, backgroundColor: selectedComments.includes(comment) ? THEME.primary : THEME.cardLight }
+                            ]}
+                            onPress={() => toggleComment(comment)}
+                          >
+                            <Text style={[
+                              styles.commentText,
+                              selectedComments.includes(comment) && styles.commentTextSelected,
+                              { fontSize: 13, color: selectedComments.includes(comment) ? '#fff' : THEME.textSecondary }
+                            ]}>
+                              {comment}
+                            </Text>
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+                    </View>
+                  )}
+                  
+                  <TouchableOpacity
+                    style={[
+                      styles.submitRatingButton,
+                      userDriverRating === 0 && styles.submitRatingButtonDisabled,
+                      { borderRadius: 22, marginTop: 10, paddingVertical: 13, paddingHorizontal: 32, backgroundColor: userDriverRating === 0 ? THEME.cardLight : THEME.primary, shadowColor: THEME.primary, shadowOpacity: 0.10, shadowRadius: 6, elevation: 4 }
+                    ]}
+                    onPress={handleRatingSubmit}
+                    disabled={userDriverRating === 0}
+                  >
+                    <Text style={[styles.submitRatingButtonText, { fontSize: 17, fontWeight: '700', letterSpacing: 0.2 }]}>Soumettre l'évaluation</Text>
+                  </TouchableOpacity>
                 </View>
                 
-                {userDriverRating > 0 && (
-                  <View style={styles.commentsSection}>
-                    <Text style={styles.commentsTitle}>
-                      {userDriverRating <= 3 ? "Que s'est-il mal passé ?" : "Qu'avez-vous apprécié ?"}
-                    </Text>
-                    <View style={styles.commentsGrid}>
-                      {getCommentSuggestions(userDriverRating).map((comment) => (
-                        <TouchableOpacity
-                          key={comment}
-                          style={[
-                            styles.commentChip,
-                            selectedComments.includes(comment) && styles.commentChipSelected
-                          ]}
-                          onPress={() => toggleComment(comment)}
-                        >
-                          <Text style={[
-                            styles.commentText,
-                            selectedComments.includes(comment) && styles.commentTextSelected
-                          ]}>
-                            {comment}
-                          </Text>
-                        </TouchableOpacity>
-                      ))}
-                    </View>
-                  </View>
-                )}
-                
-                <TouchableOpacity
-                  style={[styles.submitRatingButton, userDriverRating === 0 && styles.submitRatingButtonDisabled]}
-                  onPress={handleRatingSubmit}
-                  disabled={userDriverRating === 0}
-                >
-                  <Text style={styles.submitRatingButtonText}>Soumettre l'évaluation</Text>
-                </TouchableOpacity>
+                <Text style={{ fontSize: 16, color: THEME.textSecondary, textAlign: 'center', marginTop: 18, fontWeight: '600', letterSpacing: 0.1 }}>Merci d'avoir utilisé Caval !</Text>
               </View>
-              
-              <Text style={{ fontSize: 16, color: '#555', textAlign: 'center', marginTop: 20 }}>Merci d'avoir utilisé Caval !</Text>
-            </View>
+            </LinearGradient>
           </View>
         )}
-
-        {/* WhatsApp Support Button - Always Visible */}
-        <View style={styles.securityContainer}>
-          <TouchableOpacity
-            style={styles.whatsappFab}
-            onPress={() => {
-              const message = encodeURIComponent('Bonjour, je souhaite avoir de l\'aide concernant ma course Caval.');
-              const phone = '25377702036';
-              const url = `https://wa.me/${phone}?text=${message}`;
-              Linking.openURL(url);
-            }}
-            activeOpacity={0.85}
-          >
-            <Ionicons name="logo-whatsapp" size={28} color="#fff" />
-          </TouchableOpacity>
-          <View style={styles.securityTextContainer}>
-            <Text style={styles.securityTitle}>Besoin d'aide ?</Text>
-            <Text style={styles.securitySubtitle}>Support 24/7</Text>
-          </View>
-        </View>
       </View>
     </SafeAreaView>
   );
@@ -1536,6 +1783,14 @@ const styles = StyleSheet.create({
     fontWeight: "500",
     lineHeight: 20,
   },
+  notificationContent: {
+    flex: 1,
+  },
+  notificationSubtext: {
+    fontSize: 12,
+    lineHeight: 16,
+    marginTop: 2,
+  },
   
   // Bottom Overlay
   overlayContainer: {
@@ -1545,18 +1800,23 @@ const styles = StyleSheet.create({
     right: 0,
     height: COLLAPSED_HEIGHT,
     transform: [{ translateY: 0 }],
+    // marginBottom is now applied conditionally in the component
+    backgroundColor: THEME.background,
+    borderTopLeftRadius: 36, // More pronounced curve
+    borderTopRightRadius: 36, // More pronounced curve
   },
   overlay: {
     flex: 1,
     backgroundColor: THEME.background,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
+    borderTopLeftRadius: 36,
+    borderTopRightRadius: 36,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: -4 },
     shadowOpacity: 0.15,
     shadowRadius: 10,
     elevation: 20,
     padding: 16,
+    paddingBottom: 32, // Add extra bottom padding to raise content
   },
   pullIndicator: {
     width: 40,
@@ -1611,6 +1871,91 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     color: THEME.text,
     marginBottom: 4,
+  },
+  carInfoContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderRadius: 10,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    marginBottom: 6,
+    marginTop: 2,
+  },
+  carInfoText: {
+    color: THEME.textSecondary,
+    fontSize: 14,
+    marginBottom: 2,
+  },
+  carInfoMakeModel: {
+    fontWeight: '700',
+    color: THEME.text,
+    fontSize: 15,
+  },
+  carColorRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 2,
+  },
+  carColorDot: {
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    marginRight: 6,
+    borderWidth: 1,
+    borderColor: '#eee',
+  },
+  carColorLabel: {
+    color: THEME.textMuted,
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  plateRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  plateLabel: {
+    color: THEME.textMuted,
+    fontSize: 13,
+    fontWeight: '500',
+    marginRight: 6,
+  },
+  plateBox: {
+    backgroundColor: '#fff',
+    borderRadius: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 2,
+    borderWidth: 1.5,
+    borderColor: THEME.primary,
+    minWidth: 60,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: 2,
+  },
+  plateText: {
+    color: '#222',
+    fontWeight: '700',
+    fontSize: 14,
+    letterSpacing: 1,
+  },
+  ratingBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,215,0,0.10)',
+    borderRadius: 5,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    marginLeft: 10,
+    borderWidth: 1,
+    borderColor: '#FFD700',
+    minWidth: 38,
+    justifyContent: 'center',
+  },
+  ratingValue: {
+    color: THEME.primary,
+    fontWeight: '700',
+    fontSize: 14,
   },
   rideInfoContainer: {
     flexDirection: "row",
@@ -1888,45 +2233,6 @@ const styles = StyleSheet.create({
     elevation: 6,
     zIndex: 100,
   },
-  securityContainer: {
-    position: 'absolute',
-    right: 20,
-    bottom: Platform.OS === 'android' ? 220 : 240,
-    flexDirection: 'column',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.85)',
-    borderRadius: 25,
-    padding: 8,
-    paddingBottom: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.4,
-    shadowRadius: 8,
-    elevation: 8,
-    zIndex: 100,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
-  },
-  securityTextContainer: {
-    flexDirection: 'column',
-    marginTop: -4,
-    alignItems: 'center',
-  },
-  securityTitle: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '700',
-    textAlign: 'center',
-    lineHeight: 16,
-    marginBottom: 1,
-  },
-  securitySubtitle: {
-    color: 'rgba(255, 255, 255, 0.8)',
-    fontSize: 11,
-    fontWeight: '500',
-    textAlign: 'center',
-    lineHeight: 12,
-  },
   // Rating System Styles
   ratingSection: {
     width: '100%',
@@ -1935,7 +2241,7 @@ const styles = StyleSheet.create({
   },
   ratingTitle: {
     fontSize: 18,
-    fontWeight: 'bold',
+    fontWeight: '700',
     color: '#333',
     textAlign: 'center',
     marginBottom: 15,
@@ -1999,8 +2305,104 @@ const styles = StyleSheet.create({
   submitRatingButtonText: {
     color: '#fff',
     fontSize: 16,
-    fontWeight: 'bold',
+    fontWeight: '700',
     textAlign: 'center',
+  },
+  bottomSpacerSmall: {
+    height: 0,
+  },
+  carInfoContainerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderRadius: 10,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    marginBottom: 6,
+    marginTop: 2,
+  },
+  ratingRankColumn: {
+    alignItems: 'flex-end',
+    justifyContent: 'center',
+    marginLeft: 12,
+    minWidth: 70,
+  },
+  ratingBoxRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,215,0,0.10)',
+    borderRadius: 5,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderWidth: 1,
+    borderColor: '#FFD700',
+    minWidth: 38,
+    justifyContent: 'center',
+    marginBottom: 4,
+  },
+  rankBadge: {
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 2,
+  },
+  rankBadgeText: {
+    color: '#fff',
+    fontWeight: '700',
+    fontSize: 12,
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
+  },
+  driverNameAbove: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: THEME.text,
+    textAlign: 'center',
+    marginBottom: 6,
+  },
+  backgroundPatch: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 120, // Increased to cover gap when overlay is pulled up
+    backgroundColor: THEME.background,
+    zIndex: 0, // Behind overlay
+  },
+  // Payment Methods Styles
+  paymentMethodsContainer: {
+    marginTop: 8,
+    marginBottom: 6,
+  },
+  paymentMethodsHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  paymentMethodsTitle: {
+    fontSize: 13,
+    color: THEME.textMuted,
+    fontWeight: '600',
+  },
+  paymentMethodsList: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  paymentMethodChip: {
+    backgroundColor: 'rgba(255,107,0,0.1)',
+    borderWidth: 1,
+    borderColor: THEME.primary,
+    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  paymentMethodText: {
+    fontSize: 11,
+    color: THEME.primary,
+    fontWeight: '600',
   },
 });
 

@@ -25,20 +25,16 @@ const InboxScreen = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    navigation.setOptions({
-      headerShown: true,
-      headerTitle: 'Messages',
-      headerStyle: { 
-        backgroundColor: '#121212',
-        shadowColor: 'transparent',
-        elevation: 0,
-      },
-      headerTintColor: '#fff',
-      headerTitleStyle: { 
-        fontWeight: '600',
-        fontSize: 18,
-      },
-    });
+    // navigation.setOptions({
+    //   headerShown: true,
+    //   headerTitle: 'Messages',
+    //   headerStyle: { 
+    //     backgroundColor: '#121212',
+    //     shadowColor: 'transparent',
+    //     elevation: 0,
+    //   },
+    //   headerTintColor: '#fff',
+    // });
 
     if (currentUser) {
       fetchConversations();
@@ -218,18 +214,44 @@ const InboxScreen = () => {
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="light-content" backgroundColor="#121212" />
+      
+      {/* Custom Header */}
+      <View style={styles.header}>
+        <TouchableOpacity 
+          style={styles.backButton} 
+          onPress={() => navigation.goBack()}
+        >
+          <Ionicons name="arrow-back" size={24} color="#fff" />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Messages</Text>
+        <View style={{ width: 40 }} />
+      </View>
+      
       <View style={styles.container}>
         <View style={styles.conversationsContainer}>
           <Text style={styles.sectionTitle}>Conversations</Text>
           {conversations.length === 0 ? (
             <View style={styles.emptyContainer}>
               <View style={styles.emptyIconContainer}>
-                <Ionicons name="chatbubble-ellipses-outline" size={60} color="#FF6F00" />
+                <Ionicons name="chatbubble-ellipses-outline" size={64} color="#FF6F00" />
               </View>
-              <Text style={styles.emptyText}>No messages yet</Text>
+              <Text style={styles.emptyTitle}>Aucun Message</Text>
               <Text style={styles.emptySubtext}>
-                Your conversations with drivers and customers will appear here
+                Vous n'avez pas encore de messages. Vos conversations avec les chauffeurs apparaîtront ici.
               </Text>
+              <View style={styles.contactCard}>
+                <View style={styles.contactHeader}>
+                  <Ionicons name="help-circle-outline" size={24} color="#FF6F00" />
+                  <Text style={styles.contactTitle}>Besoin d'Aide ?</Text>
+                </View>
+                <Text style={styles.contactText}>
+                  Si vous pensez qu'il y a un problème, n'hésitez pas à nous contacter.
+                </Text>
+                <TouchableOpacity style={styles.contactButton}>
+                  <Ionicons name="mail-outline" size={20} color="#fff" />
+                  <Text style={styles.contactButtonText}>Nous Contacter</Text>
+                </TouchableOpacity>
+              </View>
             </View>
           ) : (
             <FlatList
@@ -252,6 +274,31 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#121212',
   },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingTop: 50, // Adjust based on SafeAreaView top
+    paddingBottom: 10,
+    backgroundColor: '#121212',
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#2A2A2A',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  headerTitle: {
+    color: '#fff',
+    fontSize: 20,
+    fontWeight: '600',
+    fontFamily: 'System',
+  },
   container: {
     flex: 1,
     backgroundColor: '#121212',
@@ -265,6 +312,7 @@ const styles = StyleSheet.create({
     color: '#fff',
     marginTop: 12,
     fontSize: 16,
+    fontFamily: 'System',
   },
   conversationsContainer: {
     flex: 1,
@@ -276,6 +324,7 @@ const styles = StyleSheet.create({
     color: '#fff',
     marginBottom: 16,
     paddingHorizontal: 16,
+    fontFamily: 'System',
   },
   conversationsList: {
     paddingHorizontal: 16,
@@ -338,14 +387,17 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '500',
     flex: 1,
+    fontFamily: 'System',
   },
   boldText: {
     fontWeight: 'bold',
+    fontFamily: 'System',
   },
   conversationTime: {
     color: 'rgba(255, 255, 255, 0.6)',
     fontSize: 12,
     marginLeft: 4,
+    fontFamily: 'System',
   },
   conversationFooter: {
     flexDirection: 'row',
@@ -356,10 +408,12 @@ const styles = StyleSheet.create({
     color: 'rgba(255, 255, 255, 0.6)',
     fontSize: 14,
     flex: 1,
+    fontFamily: 'System',
   },
   unreadMessage: {
     color: '#fff',
     fontWeight: '500',
+    fontFamily: 'System',
   },
   unreadBadge: {
     backgroundColor: '#FF6F00',
@@ -375,6 +429,7 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 12,
     fontWeight: 'bold',
+    fontFamily: 'System',
   },
   emptyContainer: {
     flex: 1,
@@ -391,17 +446,65 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 16,
   },
-  emptyText: {
+  emptyTitle: {
     color: '#fff',
-    fontSize: 20,
-    fontWeight: '600',
+    fontSize: 24,
+    fontWeight: '700',
     marginBottom: 8,
+    fontFamily: 'System',
   },
   emptySubtext: {
     color: 'rgba(255, 255, 255, 0.6)',
-    fontSize: 16,
+    fontSize: 18,
     textAlign: 'center',
     maxWidth: '80%',
+    marginBottom: 20,
+    fontFamily: 'System',
+  },
+  contactCard: {
+    backgroundColor: 'rgba(50, 50, 50, 0.6)',
+    borderRadius: 12,
+    padding: 20,
+    width: '100%',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  contactHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  contactTitle: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: '600',
+    marginLeft: 10,
+    fontFamily: 'System',
+  },
+  contactText: {
+    color: 'rgba(255, 255, 255, 0.6)',
+    fontSize: 14,
+    textAlign: 'center',
+    marginBottom: 15,
+    fontFamily: 'System',
+  },
+  contactButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FF6F00',
+    borderRadius: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderWidth: 1,
+    borderColor: '#FF6F00',
+  },
+  contactButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+    marginLeft: 10,
+    fontFamily: 'System',
   },
 });
 

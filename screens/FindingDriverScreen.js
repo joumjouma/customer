@@ -22,6 +22,7 @@ import { firestore } from "../firebase.config";
 import { getAuth } from "firebase/auth";
 import { MaterialIcons } from '@expo/vector-icons';
 import * as Location from "expo-location";
+import { sendWhatsAppMessage } from '../utils/whatsapp';
 
 const { width, height } = Dimensions.get("window");
 
@@ -41,7 +42,7 @@ const FindingDriverScreen = () => {
   const cancelTimer = useRef(null);
 
   // Paramètres passés depuis l'écran précédent
-  const { rideRequestId, origin, destination, rideType, distance, duration } = route.params || {};
+  const { rideRequestId, origin, destination, rideType, distance, duration, customerPhone } = route.params || {};
 
   // État pour les adresses
   const [originAddress, setOriginAddress] = useState(origin?.address || "Chargement de l'adresse...");
@@ -269,37 +270,107 @@ const FindingDriverScreen = () => {
   useEffect(() => {
     if (!rideRequestId) return;
 
+    console.log('🎯 FindingDriverScreen: Setting up ride status listener for rideId:', rideRequestId);
+    
     const rideRequestRef = doc(firestore, "rideRequests", rideRequestId);
     const unsubscribe = onSnapshot(rideRequestRef, async (docSnap) => {
       if (docSnap.exists()) {
         const data = docSnap.data();
-        console.log("Mise à jour de la demande de course :", data);
+        const currentStatus = data.status;
+        console.log("🔄 FindingDriverScreen: Ride status changed:", currentStatus, 'Data:', data);
         
         // Update ride status
-        setRideStatus(data.status);
+        setRideStatus(currentStatus);
         
         // Update driver data when available
-        if (data.status === "assigned" && data.driverId) {
-          console.log("Driver data received:", {
-            phone: data.driverPhone,
-            name: data.driverName,
-            photo: data.driverPhoto,
-            id: data.driverId
-          });
+        if (currentStatus === "assigned" && data.driverId) {
+          console.log("✅ FindingDriverScreen: Driver assigned, navigating to DriverFoundScreen");
           setDriverData(data);
           setDriverPhone(data.driverPhone);
-          
+          // Send WhatsApp message to user
+          try {
+            if (customerPhone) {
+              const phone = customerPhone.startsWith('+') ? customerPhone : `+${customerPhone}`;
+              console.log('About to send WhatsApp message to', phone);
+              await sendWhatsAppMessage(phone, "Un chauffeur a été trouvé pour votre course !");
+              console.log('WhatsApp message sent (or attempted)');
+            }
+          } catch (err) {
+            console.error('Erreur lors de l\'envoi du message WhatsApp (driver assigned):', err);
+          }
           if (!navigationDoneRef.current) {
             navigationDoneRef.current = true;
-            navigation.replace("HomeTabs", {
-              screen: "Activity"
+            // Navigate to DriverFoundScreen instead of HomeTabs
+            navigation.replace("DriverFoundScreen", {
+              rideType,
+              distance,
+              duration,
+              driverName: data.driverName,
+              driverPhoto: data.driverPhoto,
+              driverId: data.driverId,
+              driverPhone: data.driverPhone,
+              driverRating: data.driverRating || 4.9,
+              origin,
+              destination,
+              pickupLat: origin.latitude,
+              pickupLng: origin.longitude,
+              destinationLat: destination.latitude,
+              destinationLng: destination.longitude,
+              pickupAddress: originAddress,
+              destinationAddress: destinationAddress,
+              rideId: rideRequestId,
+              fare: data.fare || 0,
+              customerPhone, // Pass customerPhone forward
             });
           }
+        } else if (currentStatus === "driver_arrived" || currentStatus === "arrived_at_pickup" || currentStatus === "active" || currentStatus === "in_progress") {
+          console.log("⚠️ FindingDriverScreen: Ride in progress status detected, but should not navigate from here");
+          // Do nothing - this should be handled by DriverFoundScreen
+          // Only navigate if we're still in FindingDriverScreen and haven't navigated yet
+          if (!navigationDoneRef.current && data.driverId) {
+            console.log("🔄 FindingDriverScreen: Driver already assigned, navigating to DriverFoundScreen");
+            navigationDoneRef.current = true;
+            navigation.replace("DriverFoundScreen", {
+              rideType,
+              distance,
+              duration,
+              driverName: data.driverName,
+              driverPhoto: data.driverPhoto,
+              driverId: data.driverId,
+              driverPhone: data.driverPhone,
+              driverRating: data.driverRating || 4.9,
+              origin,
+              destination,
+              pickupLat: origin.latitude,
+              pickupLng: origin.longitude,
+              destinationLat: destination.latitude,
+              destinationLng: destination.longitude,
+              pickupAddress: originAddress,
+              destinationAddress: destinationAddress,
+              rideId: rideRequestId,
+              fare: data.fare || 0
+            });
+          }
+        } else if (currentStatus === "completed" || currentStatus === "cancelled" || currentStatus === "declined") {
+          console.log("❌ FindingDriverScreen: Ride ended with status:", currentStatus);
+          // Only navigate if ride is actually ended
+          if (!navigationDoneRef.current) {
+            navigationDoneRef.current = true;
+            navigation.navigate("HomeTabs");
+          }
+        } else {
+          console.log("🔄 FindingDriverScreen: Ride continuing with status:", currentStatus);
         }
+      } else {
+        console.log("⚠️ FindingDriverScreen: Ride document does not exist");
       }
     });
-    return () => unsubscribe();
-  }, [rideRequestId, navigation, rideType, distance, duration, origin, destination, originAddress, destinationAddress]);
+    
+    return () => {
+      console.log('🎯 FindingDriverScreen: Cleaning up ride status listener');
+      unsubscribe();
+    };
+  }, [rideRequestId, navigation, rideType, distance, duration, origin, destination, originAddress, destinationAddress, customerPhone]);
 
   const pulseScale = pulseAnim.interpolate({
     inputRange: [0, 1],

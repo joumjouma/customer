@@ -44,7 +44,7 @@ export default function AnimatedLoginScreen() {
   const [step, setStep] = useState(STEPS.WELCOME);
   const [username, setUsername] = useState("");
   const [loginMethod, setLoginMethod] = useState("phone");
-  const [phoneNumber, setPhoneNumber] = useState("");
+  const [phoneNumber, setPhoneNumber] = useState("+253");
   const [email, setEmail] = useState("");
   const [verificationId, setVerificationId] = useState("");
   const [verificationCode, setVerificationCode] = useState("");

@@ -13,6 +13,7 @@ import {
   Keyboard,
   TextInput,
   FlatList,
+  PanResponder,
 } from "react-native";
 import MapView, { Marker } from "react-native-maps";
 import MapViewDirections from "react-native-maps-directions";
@@ -22,6 +23,7 @@ import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { collection, addDoc, serverTimestamp, query, where, getDocs, limit, getDoc, doc } from "firebase/firestore";
 import { firestore } from "../firebase.config";
 import { getAuth } from "firebase/auth";
+import { sendWhatsAppMessage } from '../utils/whatsapp';
 
 // Your custom pin and Caval Moto icon
 import CustomPin from "../assets/CustomPin.png";
@@ -77,6 +79,9 @@ const RideOptionsScreen = () => {
 
   // Add a ref to store the current map center
   const mapCenterRef = useRef(null);
+
+  // Track if the next region change is programmatic
+  const programmaticMoveRef = useRef(false);
 
   // Fallback initial region
   const initialRegion = {
@@ -310,6 +315,15 @@ const RideOptionsScreen = () => {
 
     const rideRequestId = await createRideRequest(selectedRideType, selectedFare);
     if (rideRequestId) {
+      // Send WhatsApp message to user
+      try {
+        if (customerPhone) {
+          const phone = customerPhone.startsWith('+') ? customerPhone : `+${customerPhone}`;
+          await sendWhatsAppMessage(phone, "Votre commande de course a été reçue ! Nous cherchons un chauffeur pour vous.");
+        }
+      } catch (err) {
+        console.error('Erreur lors de l\'envoi du message WhatsApp:', err);
+      }
       setPaymentModalVisible(false);
       navigation.navigate("FindingDriverScreen", {
         rideType: selectedRideType,
@@ -319,6 +333,7 @@ const RideOptionsScreen = () => {
         origin: route.params.origin,
         destination: route.params.destination,
         paymentMethod: selectedPaymentMethod ? selectedPaymentMethod.type : "cash",
+        customerPhone, // Pass customerPhone forward
       });
     } else {
       alert("Erreur lors de la création de la demande. Veuillez réessayer.");
@@ -565,20 +580,25 @@ const RideOptionsScreen = () => {
   // Pin dropping functions
   const startLocationSelection = (mode) => {
     setSelectionMode(mode);
-    setSelectedLocation(null);
+    // Set initial pin location to current origin/destination or map center
+    if (mode === 'pickup') {
+      setSelectedLocation(modifiedOrigin || origin);
+    } else if (mode === 'dropoff') {
+      setSelectedLocation(modifiedDestination || destination);
+    } else {
+      setSelectedLocation(null);
+    }
     setIsFullScreenMap(true);
-    
     // Set initial region for full-screen mode
     setTimeout(() => {
       if (mapRef.current) {
         const currentOrigin = modifiedOrigin || origin;
         const currentDestination = modifiedDestination || destination;
-        
+        programmaticMoveRef.current = true;
         if (currentOrigin && currentDestination) {
           // Center between origin and destination
           const centerLat = (currentOrigin.latitude + currentDestination.latitude) / 2;
           const centerLng = (currentOrigin.longitude + currentDestination.longitude) / 2;
-          
           mapRef.current.animateToRegion({
             latitude: centerLat,
             longitude: centerLng,
@@ -686,31 +706,36 @@ const RideOptionsScreen = () => {
         latitude: newRegion.latitude,
         longitude: newRegion.longitude
       };
-      setSelectedLocation({
-        latitude: newRegion.latitude,
-        longitude: newRegion.longitude
-      });
-      try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 10000);
-        const response = await fetch(
-          `https://maps.googleapis.com/maps/api/geocode/json?latlng=${newRegion.latitude},${newRegion.longitude}&key=${GOOGLE_API_KEY}`,
-          {
-            signal: controller.signal,
-            timeout: 10000
+      // Only update selectedLocation if this was a user-initiated move
+      if (programmaticMoveRef.current) {
+        programmaticMoveRef.current = false;
+      } else {
+        setSelectedLocation({
+          latitude: newRegion.latitude,
+          longitude: newRegion.longitude
+        });
+        try {
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 10000);
+          const response = await fetch(
+            `https://maps.googleapis.com/maps/api/geocode/json?latlng=${newRegion.latitude},${newRegion.longitude}&key=${GOOGLE_API_KEY}`,
+            {
+              signal: controller.signal,
+              timeout: 10000
+            }
+          );
+          clearTimeout(timeoutId);
+          const data = await response.json();
+          if (data.status === "OK" && data.results && data.results.length > 0) {
+            const address = data.results[0].formatted_address;
+            setSearchText(address);
           }
-        );
-        clearTimeout(timeoutId);
-        const data = await response.json();
-        if (data.status === "OK" && data.results && data.results.length > 0) {
-          const address = data.results[0].formatted_address;
-          setSearchText(address);
-        }
-      } catch (error) {
-        if (error.name === 'AbortError') {
-          console.error("Request timed out");
-        } else {
-          console.error("Error reverse geocoding:", error);
+        } catch (error) {
+          if (error.name === 'AbortError') {
+            console.error("Request timed out");
+          } else {
+            console.error("Error reverse geocoding:", error);
+          }
         }
       }
     }
@@ -782,6 +807,28 @@ const RideOptionsScreen = () => {
     }
   };
 
+  // Map rotation state and functions
+  const [mapRotation, setMapRotation] = useState(0);
+  const rotateMap = (direction) => {
+    const rotationStep = 15;
+    let newRotation = mapRotation;
+    if (direction === 'left') {
+      newRotation -= rotationStep;
+    } else if (direction === 'right') {
+      newRotation += rotationStep;
+    }
+    setMapRotation(newRotation);
+    if (mapRef.current) {
+      mapRef.current.animateCamera({ heading: newRotation }, { duration: 300 });
+    }
+  };
+  const resetMapRotation = () => {
+    setMapRotation(0);
+    if (mapRef.current) {
+      mapRef.current.animateCamera({ heading: 0 }, { duration: 300 });
+    }
+  };
+
   return (
     <View style={styles.container}>
       {isFullScreenMap ? (
@@ -803,7 +850,7 @@ const RideOptionsScreen = () => {
             showsUserLocation
             showsMyLocationButton={false}
             showsCompass={false}
-            rotateEnabled={false}
+            rotateEnabled={true}
             scrollEnabled={true}
             zoomEnabled={true}
             pitchEnabled={false}
@@ -954,7 +1001,7 @@ const RideOptionsScreen = () => {
             showsUserLocation
             showsMyLocationButton={false}
             showsCompass={false}
-            rotateEnabled={false}
+            rotateEnabled={true}
             mapPadding={{ top: 250, right: 0, bottom: 350, left: 0 }}
             scrollEnabled={true}
             zoomEnabled={true}
@@ -1074,18 +1121,15 @@ const RideOptionsScreen = () => {
             keyboardVerticalOffset={Platform.OS === "ios" ? 100 : 0}
           >
             <View
-              style={[
-                styles.bottomSheet,
-                {
-                  bottom: keyboardVisible ? (Platform.OS === 'ios' ? 1 : keyboardHeight - 50) : 0,
-                }
-              ]}
+              style={styles.bottomSheet}
               onLayout={e => {
                 const { height } = e.nativeEvent.layout;
                 setBottomSheetHeight(height);
               }}
             >
-              <View style={styles.headerContainer}>
+              <View
+                style={styles.headerContainer}
+              >
                 <Text style={styles.headerText}>Choisissez votre trajet</Text>
                 <TouchableOpacity 
                   style={styles.editButton}
@@ -1098,7 +1142,6 @@ const RideOptionsScreen = () => {
                   />
                 </TouchableOpacity>
               </View>
-              
               {/* Route Summary */}
               <View style={styles.routeSummaryContainer}>
                 {/* Origin Point */}
@@ -1170,9 +1213,7 @@ const RideOptionsScreen = () => {
                     </View>
                   )}
                 </View>
-                
                 <View style={styles.routeLine} />
-                
                 {/* Destination Point */}
                 <View style={styles.routePoint}>
                   <View style={[styles.routeDot, styles.routeDotDestination]} />
@@ -1243,9 +1284,7 @@ const RideOptionsScreen = () => {
                   )}
                 </View>
               </View>
-
               <View style={styles.divider} />
-              
               {/* Ride Option Components */}
               <RideOption
                 rideType="Caval Privé"
@@ -1255,7 +1294,6 @@ const RideOptionsScreen = () => {
                 fare={cavalPriveFare}
                 onSelect={() => handleRideSelection("Caval Privé")}
               />
-
               <RideOption
                 rideType="Caval moto"
                 iconName="motorbike"
@@ -1266,15 +1304,6 @@ const RideOptionsScreen = () => {
                 useMotoImage
                 maxPeople={1}
               />
-
-              {/* New Button to navigate to PaymentMethodsScreen */}
-              <TouchableOpacity
-                style={styles.paymentMethodsButton}
-                onPress={() => navigation.navigate("PaymentMethodsScreen")}
-              >
-                <Ionicons name="card" size={24} color="#FF6F00" />
-                <Text style={styles.paymentMethodsButtonText}>Gérer les moyens de paiement</Text>
-              </TouchableOpacity>
             </View>
           </KeyboardAvoidingView>
           

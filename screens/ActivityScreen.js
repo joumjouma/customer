@@ -122,7 +122,7 @@ function ActivityScreen() {
     const currentQuery = query(
       currentRidesRef,
       where("userId", "==", currentUser.uid),
-      where("status", "==", "active"),
+      where("status", "not-in", ["completed", "cancelled", "declined"]),
       orderBy("createdAt", "desc")
     );
 
@@ -140,6 +140,9 @@ function ActivityScreen() {
         id: doc.id,
         ...doc.data(),
       }));
+      console.log('📊 ActivityScreen: Current rides updated:', ridesData.length, 'rides');
+      
+      // Filter out rides that are currently being handled by DriverFoundScreen
       setCurrentRides(ridesData);
     });
 
@@ -148,6 +151,7 @@ function ActivityScreen() {
         id: doc.id,
         ...doc.data(),
       }));
+      console.log('📊 ActivityScreen: Completed rides updated:', ridesData.length, 'rides');
       setCompletedRides(ridesData);
       setLoading(false);
     });
@@ -216,7 +220,7 @@ function ActivityScreen() {
 
     const handleRidePress = () => {
       if (isCurrentRide) {
-        // Navigate to DriverFoundScreen for current rides
+        // Always allow navigation to DriverFoundScreen for any current ride
         navigation.navigate("DriverFoundScreen", {
           rideId: item.id,
           rideType: item.rideType,
@@ -233,6 +237,7 @@ function ActivityScreen() {
           fare: item.fare || 0,
         });
       } else {
+        console.log('📋 ActivityScreen: Showing details for completed ride:', item.id);
         // Show details alert for completed rides
         Alert.alert(
           "Détails de la course",
@@ -240,6 +245,33 @@ function ActivityScreen() {
           [{ text: "OK" }]
         );
       }
+    };
+
+    // Add cancel ride handler
+    const handleCancelRide = () => {
+      Alert.alert(
+        "Annuler la course",
+        "Êtes-vous sûr de vouloir annuler cette course ? Cette action ne peut pas être annulée.",
+        [
+          { text: "Non", style: "cancel" },
+          {
+            text: "Oui, annuler",
+            style: "destructive",
+            onPress: async () => {
+              try {
+                await firestore
+                  .collection("rideRequests")
+                  .doc(item.id)
+                  .update({ status: "cancelled", cancelledAt: new Date(), cancelledBy: "customer" });
+                Alert.alert("Course annulée", "Votre course a été annulée.");
+                navigation.navigate("ActivityScreen");
+              } catch (error) {
+                Alert.alert("Erreur", "Impossible d'annuler la course. Veuillez réessayer.");
+              }
+            },
+          },
+        ]
+      );
     };
 
     const getStatusText = () => {
@@ -530,12 +562,6 @@ function ActivityScreen() {
       
       {/* Clean header with just the buttons */}
       <View style={styles.cleanHeader}>
-        <TouchableOpacity
-          style={[styles.headerButton, { backgroundColor: colors.buttonBackground }]}
-          onPress={() => navigation.navigate("HomeTabs")}
-        >
-          <Ionicons name="arrow-back" size={22} color={colors.textPrimary} />
-        </TouchableOpacity>
         
         <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>
           Historique des courses
@@ -649,6 +675,11 @@ function getThemeColors(theme) {
       destinationColor: '#E53935',
       divider: '#333333',
       buttonBackground: '#2A2A2A',
+      fontFamily: {
+        regular: 'System',
+        medium: 'System',
+        bold: 'System',
+      },
     };
   }
   return {
@@ -665,6 +696,11 @@ function getThemeColors(theme) {
     destinationColor: '#E53935',
     divider: '#EEEEEE',
     buttonBackground: '#FFFFFF',
+    fontFamily: {
+      regular: 'System',
+      medium: 'System',
+      bold: 'System',
+    },
   };
 }
 

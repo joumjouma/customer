@@ -20,6 +20,8 @@ import { auth } from "./firebase.config";
 import { getAuth, signInWithCustomToken, signInWithEmailAndPassword } from "firebase/auth"; // Firebase Auth
 import firebase from './firebase.config';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { THEME } from './constants/theme';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 // Add crypto polyfill
 import 'react-native-get-random-values';
@@ -37,12 +39,12 @@ import AccountScreen from "./screens/accountScreen";
 import WalletScreen from "./screens/WalletScreen";
 import ModifyFieldScreen from "./screens/ModifyFieldScreen";
 import ForgotPasswordScreen from "./screens/ForgotPasswordScreen";
-import { PaymentMethodsScreen } from "./screens/PaymentMethodsScreen";
 import FindingDriverScreen from "./screens/FindingDriverScreen";
 import DriverFoundScreen from "./screens/DriverFoundScreen";
 import InboxScreen from './screens/InboxScreen';
 import CustomerInboxScreen from './screens/CustomerInboxScreen';
 import AnimatedLoginScreen from "./screens/AnimatedLoginScreen";
+import PaymentMethodsScreen from "./screens/PaymentMethodsScreen";
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -162,87 +164,109 @@ const AppContent = () => {
   }
 
   return (
-    <NavigationContainer
-      theme={{
-        colors: {
-          background: '#121212',
-          card: '#1e1e1e',
-          text: '#ffffff',
-          border: '#333333',
-          primary: '#ff9f43',
-        },
-        dark: true,
-      }}
-    >
-      <Stack.Navigator
-        screenOptions={{
-          headerShown: false,
-          cardStyle: { backgroundColor: '#121212' },
-          animationEnabled: false
+    <SafeAreaProvider>
+      <NavigationContainer
+        theme={{
+          colors: {
+            background: '#121212',
+            card: '#1e1e1e',
+            text: '#ffffff',
+            border: '#333333',
+            primary: '#ff9f43',
+          },
+          dark: true,
+          fonts: {
+            regular: {
+              fontFamily: 'System',
+            },
+            medium: {
+              fontFamily: 'System',
+            },
+            light: {
+              fontFamily: 'System',
+            },
+            thin: {
+              fontFamily: 'System',
+            },
+          },
         }}
-        initialRouteName={user ? "HomeTabs" : "LoginScreen"}
       >
-        {/* Authentication Screens */}
-        <Stack.Screen
-          name="LoginScreen"
-          component={AnimatedLoginScreen}
-        />
-        <Stack.Screen
-          name="RegisterScreen"
-          component={RegisterScreen}
-        />
-        <Stack.Screen
-          name="ForgotPasswordScreen"
-          component={ForgotPasswordScreen}
-        />
+        <Stack.Navigator
+          screenOptions={{
+            headerShown: false,
+            cardStyle: { backgroundColor: '#121212' },
+            animationEnabled: false
+          }}
+          initialRouteName={user ? "HomeTabs" : "LoginScreen"}
+        >
+          {/* Authentication Screens */}
+          <Stack.Screen
+            name="LoginScreen"
+            component={AnimatedLoginScreen}
+          />
+          <Stack.Screen
+            name="RegisterScreen"
+            component={RegisterScreen}
+          />
+          <Stack.Screen
+            name="ForgotPasswordScreen"
+            component={ForgotPasswordScreen}
+          />
 
-        {/* Main App Screens */}
-        <Stack.Screen
-          name="HomeTabs"
-          component={HomeTabs}
-        />
-        <Stack.Screen
-          name="RideOptionsScreen"
-          component={RideOptionsScreen}
-        />
-        <Stack.Screen
-          name="FindingDriverScreen"
-          component={FindingDriverScreen}
-        />
-        <Stack.Screen
-          name="DriverFoundScreen"
-          component={DriverFoundScreen}
-        />
-        <Stack.Screen
-          name="SettingsScreen"
-          component={SettingsScreen}
-        />
-        <Stack.Screen
-          name="AccountScreen"
-          component={AccountScreen}
-        />
-        <Stack.Screen
-          name="WalletScreen"
-          component={WalletScreen}
-        />
-        <Stack.Screen
-          name="ModifyFieldScreen"
-          component={ModifyFieldScreen}
-        />
-        <Stack.Screen
-          name="PaymentMethodsScreen"
-          component={PaymentMethodsScreen}
-        />
-        <Stack.Screen
-          name="InboxScreen"
-          component={InboxScreen}
-        />
-        <Stack.Screen
-          name="CustomerInboxScreen"
-          component={CustomerInboxScreen}
-        />
-      </Stack.Navigator>
-    </NavigationContainer>
+          {/* Main App Screens */}
+          <Stack.Screen
+            name="HomeTabs"
+            component={HomeTabs}
+          />
+          <Stack.Screen
+            name="RideOptionsScreen"
+            component={RideOptionsScreen}
+          />
+          <Stack.Screen
+            name="FindingDriverScreen"
+            component={FindingDriverScreen}
+          />
+          <Stack.Screen
+            name="DriverFoundScreen"
+            component={DriverFoundScreen}
+          />
+          <Stack.Screen
+            name="SettingsScreen"
+            component={SettingsScreen}
+          />
+          <Stack.Screen
+            name="AccountScreen"
+            component={AccountScreen}
+          />
+          <Stack.Screen
+            name="WalletScreen"
+            component={WalletScreen}
+          />
+          <Stack.Screen
+            name="ModifyFieldScreen"
+            component={ModifyFieldScreen}
+          />
+          <Stack.Screen
+            name="InboxScreen"
+            component={InboxScreen}
+            options={{
+              headerShown: false,
+            }}
+          />
+          <Stack.Screen
+            name="CustomerInboxScreen"
+            component={CustomerInboxScreen}
+          />
+          <Stack.Screen
+            name="PaymentMethodsScreen"
+            component={PaymentMethodsScreen}
+            options={{
+              headerShown: false,
+            }}
+          />
+        </Stack.Navigator>
+      </NavigationContainer>
+    </SafeAreaProvider>
   );
 };
 

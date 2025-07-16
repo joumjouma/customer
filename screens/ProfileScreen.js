@@ -102,6 +102,11 @@ function Profile() {
     statusBarColor: isDarkMode ? "#121212" : "#F7F7F7",
     serviceIcon: "#FFFFFF",
     serviceCardBackground: isDarkMode ? "#2A2A2A" : "#FFFFFF",
+    fontFamily: {
+      regular: 'System',
+      medium: 'System',
+      bold: 'System',
+    },
   };
 
   const fetchUserData = async () => {

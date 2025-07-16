@@ -33,7 +33,7 @@ import { firebaseConfig } from '../firebase.config';
 function LoginScreen() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [phoneNumber, setPhoneNumber] = useState(Platform.OS === 'ios' ? '+253' : '');
+  const [phoneNumber, setPhoneNumber] = useState('+253');
   const [fname, setFname] = useState("");
   const [lname, setLname] = useState("");
   const [loginMethod, setLoginMethod] = useState("phone"); // Default to 'phone' for Téléphone tab
@@ -408,9 +408,9 @@ function LoginScreen() {
     }, 500);
   };
 
-  // When switching to phone login on iOS, prefill +253 if empty
+  // When switching to phone login, prefill +253 if empty
   useEffect(() => {
-    if (Platform.OS === 'ios' && loginMethod === 'phone' && !phoneNumber) {
+    if (loginMethod === 'phone' && !phoneNumber) {
       setPhoneNumber('+253');
     }
   }, [loginMethod]);

@@ -32,7 +32,7 @@ function RegisterScreen() {
   const [password, setPassword] = useState("");
   const [fname, setFname] = useState("");
   const [lname, setLname] = useState("");
-  const [number, setNumber] = useState(Platform.OS === 'ios' ? '+253' : '');
+  const [number, setNumber] = useState('+253');
   const [loading, setLoading] = useState(false);
   const [verificationId, setVerificationId] = useState("");
   const [verificationCode, setVerificationCode] = useState("");
@@ -45,9 +45,9 @@ function RegisterScreen() {
 
   const navigation = useNavigation();
 
-  // When switching to phone registration on iOS, prefill +253 if empty
+  // When switching to phone registration, prefill +253 if empty
   React.useEffect(() => {
-    if (Platform.OS === 'ios' && registrationMethod === 'phone' && !number) {
+    if (registrationMethod === 'phone' && !number) {
       setNumber('+253');
     }
   }, [registrationMethod]);

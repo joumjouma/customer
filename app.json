@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "Caval Customer",
+    "name": "Caval",
     "slug": "Eco-share",
     "owner": "zouhair123",
     "version": "1.0.0",
@@ -17,7 +17,6 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.misscoding.Eco-Share-Customer",
       "googleServicesFile": "./GoogleService-Info.plist",
-      "newArchEnabled": false,
       "buildNumber": "25",
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "We need your location to show nearby rides and provide accurate navigation.",

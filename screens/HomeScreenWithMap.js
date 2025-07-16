@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
 import {
-  SafeAreaView,
   View,
   Text,
   StyleSheet,
@@ -17,14 +16,17 @@ import {
   Alert,
   Linking,
   Animated,
+  ScrollView,
+  PanResponder,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import * as Location from "expo-location";
 import { GooglePlacesAutocomplete } from "react-native-google-places-autocomplete";
 import MapView, { Marker, PROVIDER_DEFAULT } from "react-native-maps";
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { LinearGradient } from "expo-linear-gradient";
-import { doc, getDoc, collection, addDoc } from "firebase/firestore";
+import { doc, getDoc, collection, addDoc, query, where, orderBy, limit, onSnapshot, getDocs } from "firebase/firestore";
 import { auth, firestore } from "../firebase.config";
 import CavalLogo from "../assets/Caval_Logo-removebg-preview.png";
 import CustomPin from "../assets/CustomPin.png";
@@ -92,6 +94,8 @@ const HomeScreenWithMap = ({ userName = "User" }) => {
   const [loading, setLoading] = useState(false);
   const [recentSearches, setRecentSearches] = useState([]);
   const [searchText, setSearchText] = useState("");
+  const [mapRotation, setMapRotation] = useState(0); // Add rotation state
+  // Remove whatsappModalVisible state
 
   const googlePlacesRef = useRef(null);
   const googlePickupRef = useRef(null);
@@ -278,8 +282,8 @@ const HomeScreenWithMap = ({ userName = "User" }) => {
             setFromLocation({ latitude, longitude });
             setPickupText("Position actuelle");
           }
-          // Shift the view down by adjusting the latitude
-          const adjustedLatitude = latitude - 0.005; // Reduced shift to 0.005 degrees
+          // Shift the view up by adjusting the latitude to show the current location pin higher
+          const adjustedLatitude = latitude + 0.008; // Shift up by adding to latitude
           setRegion({ latitude: adjustedLatitude, longitude, ...defaultZoomDelta });
           mapRef.current?.animateToRegion({ latitude: adjustedLatitude, longitude, ...defaultZoomDelta }, 1000);
         }
@@ -443,8 +447,8 @@ const HomeScreenWithMap = ({ userName = "User" }) => {
 
   const centerOnCurrentLocation = () => {
     if (fromLocation) {
-      // Shift the view down by adjusting the latitude
-      const adjustedLatitude = fromLocation.latitude - 0.005; // Reduced shift to 0.005 degrees
+      // Shift the view up by adjusting the latitude to show the current location pin higher
+      const adjustedLatitude = fromLocation.latitude + 0.008; // Shift up by adding to latitude
       mapRef.current?.animateToRegion(
         { latitude: adjustedLatitude, longitude: fromLocation.longitude, ...defaultZoomDelta },
         500
@@ -455,6 +459,28 @@ const HomeScreenWithMap = ({ userName = "User" }) => {
   // Theme toggle function
   const toggleTheme = () => setIsDarkMode((prev) => !prev);
 
+  // Map rotation functions
+  const rotateMap = (direction) => {
+    const rotationStep = 15;
+    let newRotation = mapRotation;
+    if (direction === 'left') {
+      newRotation -= rotationStep;
+    } else if (direction === 'right') {
+      newRotation += rotationStep;
+    }
+    setMapRotation(newRotation);
+    if (mapRef.current) {
+      mapRef.current.animateCamera({ heading: newRotation }, { duration: 300 });
+    }
+  };
+
+  const resetMapRotation = () => {
+    setMapRotation(0);
+    if (mapRef.current) {
+      mapRef.current.animateCamera({ heading: 0 }, { duration: 300 });
+    }
+  };
+
   // Add new state for map selection mode
   const [selectionMode, setSelectionMode] = useState(null); // 'pickup' or 'dropoff' or null
   const [selectedLocation, setSelectedLocation] = useState(null);
@@ -463,6 +489,40 @@ const HomeScreenWithMap = ({ userName = "User" }) => {
   const fadeAnim = useRef(new Animated.Value(1)).current;
   const slideAnim = useRef(new Animated.Value(0)).current;
   const mapScaleAnim = useRef(new Animated.Value(1)).current;
+
+  // Add animated value and pan responder for bottom sheet
+  const bottomSheetTranslateY = useRef(new Animated.Value(0)).current;
+  const DRAG_RANGE = 40; // pixels
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (evt, gestureState) => {
+        // Only respond to vertical drags starting on the drag handle
+        return Math.abs(gestureState.dy) > 5 && Math.abs(gestureState.dx) < 20;
+      },
+      onPanResponderMove: (evt, gestureState) => {
+        // Clamp the drag between -DRAG_RANGE and 0
+        if (gestureState.dy < 0) {
+          bottomSheetTranslateY.setValue(Math.max(gestureState.dy, -DRAG_RANGE));
+        } else {
+          bottomSheetTranslateY.setValue(Math.min(gestureState.dy, 0));
+        }
+      },
+      onPanResponderRelease: () => {
+        // Snap back to 0
+        Animated.spring(bottomSheetTranslateY, {
+          toValue: 0,
+          useNativeDriver: true,
+        }).start();
+      },
+      onPanResponderTerminate: () => {
+        Animated.spring(bottomSheetTranslateY, {
+          toValue: 0,
+          useNativeDriver: true,
+        }).start();
+      },
+    })
+  ).current;
 
   // Add animation function
   const animateTransition = (toSelectionMode) => {
@@ -507,16 +567,48 @@ const HomeScreenWithMap = ({ userName = "User" }) => {
     }
   };
 
+  // Only center/zoom the map once per selection mode
+  const hasCenteredForSelection = useRef(false);
+
   // Modify startLocationSelection to include animation
   const startLocationSelection = (mode) => {
     animateTransition(true);
     setSelectionMode(mode);
-    setSelectedLocation(null);
+    hasCenteredForSelection.current = false;
+    // Set initial pin location to current origin/destination or map center
+    if (mode === 'pickup') {
+      setSelectedLocation(fromLocation);
+    } else if (mode === 'dropoff') {
+      setSelectedLocation(destination);
+    } else {
+      setSelectedLocation(null);
+    }
+    // Center the map programmatically ONLY ONCE
+    setTimeout(() => {
+      if (mapRef.current && !hasCenteredForSelection.current) {
+        programmaticMoveRef.current = true;
+        if (mode === 'pickup' && fromLocation) {
+          mapRef.current.animateToRegion({
+            latitude: fromLocation.latitude,
+            longitude: fromLocation.longitude,
+            ...zoomedInDelta,
+          }, 500);
+        } else if (mode === 'dropoff' && destination) {
+          mapRef.current.animateToRegion({
+            latitude: destination.latitude,
+            longitude: destination.longitude,
+            ...zoomedInDelta,
+          }, 500);
+        }
+        hasCenteredForSelection.current = true;
+      }
+    }, 100);
   };
 
   // Modify the selection mode cancel to include animation
   const handleCancelSelection = () => {
     animateTransition(false);
+    hasCenteredForSelection.current = false;
     setTimeout(() => {
       setSelectionMode(null);
     }, 300);
@@ -553,34 +645,36 @@ const HomeScreenWithMap = ({ userName = "User" }) => {
   const handleRegionChangeComplete = async (newRegion) => {
     if (selectionMode) {
       setRegion(newRegion);
-      setSelectedLocation({
-        latitude: newRegion.latitude,
-        longitude: newRegion.longitude
-      });
-
-      try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 10000);
-
-        const response = await fetch(
-          `https://maps.googleapis.com/maps/api/geocode/json?latlng=${newRegion.latitude},${newRegion.longitude}&key=${GOOGLE_API_KEY}`,
-          {
-            signal: controller.signal,
-            timeout: 10000
+      // Only update selectedLocation if this was a user-initiated move
+      if (programmaticMoveRef.current) {
+        programmaticMoveRef.current = false;
+      } else {
+        setSelectedLocation({
+          latitude: newRegion.latitude,
+          longitude: newRegion.longitude
+        });
+        try {
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 10000);
+          const response = await fetch(
+            `https://maps.googleapis.com/maps/api/geocode/json?latlng=${newRegion.latitude},${newRegion.longitude}&key=${GOOGLE_API_KEY}`,
+            {
+              signal: controller.signal,
+              timeout: 10000
+            }
+          );
+          clearTimeout(timeoutId);
+          const data = await response.json();
+          if (data.status === "OK" && data.results && data.results.length > 0) {
+            const address = data.results[0].formatted_address;
+            setSearchText(address);
           }
-        );
-        clearTimeout(timeoutId);
-        const data = await response.json();
-        
-        if (data.status === "OK" && data.results && data.results.length > 0) {
-          const address = data.results[0].formatted_address;
-          setSearchText(address);
-        }
-      } catch (error) {
-        if (error.name === 'AbortError') {
-          console.error("Request timed out");
-        } else {
-          console.error("Error reverse geocoding:", error);
+        } catch (error) {
+          if (error.name === 'AbortError') {
+            console.error("Request timed out");
+          } else {
+            console.error("Error reverse geocoding:", error);
+          }
         }
       }
     }
@@ -733,6 +827,20 @@ const HomeScreenWithMap = ({ userName = "User" }) => {
         shadowOffset: { width: 0, height: 2 },
         elevation: 3,
         marginRight: 10,
+      },
+      rotationButton: {
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        backgroundColor: isDarkMode ? "#2D2D2D" : "#fff",
+        justifyContent: "center",
+        alignItems: "center",
+        shadowColor: "#000",
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+        shadowOffset: { width: 0, height: 2 },
+        elevation: 3,
+        marginRight: 8,
       },
       activeRideBanner: {
         position: "absolute",
@@ -1089,49 +1197,68 @@ const HomeScreenWithMap = ({ userName = "User" }) => {
         zIndex: 20,
       },
       whatsappOrderButton: {
+        position: 'absolute',
+        top: Platform.OS === 'ios' ? 260 : 240,
+        left: 16,
+        right: 16,
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: '#25D366',
+        backgroundColor: '#fff',
+        borderWidth: 2,
+        borderColor: '#FF6F00',
         borderRadius: 12,
-        marginHorizontal: 16,
-        marginTop: 12,
-        marginBottom: 0,
         paddingVertical: 12,
-        paddingHorizontal: 16,
-        shadowColor: '#25D366',
-        shadowOpacity: 0.12,
+        paddingHorizontal: 20,
+        shadowColor: '#000',
+        shadowOpacity: 0.1,
         shadowOffset: { width: 0, height: 2 },
-        shadowRadius: 8,
-        elevation: 2,
-      },
-      whatsappOrderText: {
-        color: '#fff',
-        fontSize: 16,
-        fontWeight: 'bold',
-        textAlign: 'center',
-      },
-      whatsappFab: {
-        position: 'absolute',
-        right: 24,
-        bottom: Platform.OS === 'android' ? 100 : 120,
-        width: 60,
-        height: 60,
-        borderRadius: 30,
-        backgroundColor: '#25D366',
-        justifyContent: 'center',
-        alignItems: 'center',
-        shadowColor: '#25D366',
-        shadowOpacity: 0.25,
-        shadowOffset: { width: 0, height: 4 },
-        shadowRadius: 8,
-        elevation: 6,
+        shadowRadius: 6,
+        elevation: 3,
         zIndex: 100,
       },
+      whatsappOrderText: {
+        color: '#FF6F00',
+        fontSize: 14,
+        fontWeight: '600',
+        textAlign: 'center',
+      },
+      // Remove modalOverlay, modalContent, modalTitle, modalStepTitle, modalText, modalButton, modalButtonText, modalCancelButton, modalCancelButtonText styles
+      // Remove WhatsApp modal component from render
+      // Restore WhatsApp button to directly open WhatsApp
     });
   };
 
   const styles = getThemedStyles();
+
+  // Remove handleOpenWhatsApp
+
+  const [activeRide, setActiveRide] = useState(null);
+
+  // Listen for active rides for the current user
+  useEffect(() => {
+    const currentUser = auth.currentUser;
+    if (!currentUser) return;
+    const currentRidesRef = collection(firestore, "rideRequests");
+    const currentQuery = query(
+      currentRidesRef,
+      where("userId", "==", currentUser.uid),
+      where("status", "not-in", ["completed", "cancelled", "declined"]),
+      orderBy("createdAt", "desc")
+    );
+    const unsubscribe = onSnapshot(currentQuery, (snapshot) => {
+      const ridesData = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+      if (ridesData.length > 0) {
+        setActiveRide(ridesData[0]);
+      } else {
+        setActiveRide(null);
+      }
+    });
+    return () => unsubscribe();
+  }, []);
+
+  // Track if the next region change is programmatic
+  const programmaticMoveRef = useRef(false);
 
   return (
     <View style={styles.container}>
@@ -1156,12 +1283,14 @@ const HomeScreenWithMap = ({ userName = "User" }) => {
                 ref={mapRef}
                 provider={PROVIDER_DEFAULT}
                 style={StyleSheet.absoluteFill}
-                region={region}
+                {...(selectionMode
+                  ? { initialRegion: region }
+                  : { region })}
                 customMapStyle={darkMapStyle}
                 showsUserLocation={false}
                 showsMyLocationButton={false}
                 showsCompass={false}
-                rotateEnabled={false}
+                rotateEnabled={true}
                 mapPadding={{ 
                   top: 100, 
                   right: 0, 
@@ -1179,7 +1308,7 @@ const HomeScreenWithMap = ({ userName = "User" }) => {
                 maxZoomLevel={20}
               >
                 {/* Always show the pickup marker unless we're selecting a new pickup */}
-                {(fromLocation && (selectionMode !== 'pickup')) && (
+                {fromLocation && (
                   <Marker coordinate={fromLocation} title="Votre position" anchor={{ x: 0.5, y: 0.5 }}>
                     <View style={{
                       width: 32,
@@ -1385,35 +1514,29 @@ const HomeScreenWithMap = ({ userName = "User" }) => {
             </Animated.View>
           )}
 
-          {/* ACTIVE RIDE BANNER */}
-          {!selectionMode && route.params?.activeRide && (
-            <TouchableOpacity style={styles.activeRideBanner} onPress={() => navigation.navigate("DriverFoundScreen", route.params.activeRide)}>
-              <LinearGradient colors={["#FF9500", "#FF6F00"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.activeRideBannerGradient}>
-                <Ionicons name="car-sport" size={20} color="#fff" style={{ marginRight: 8 }} />
-                <Text style={styles.activeRideBannerText}>Vous avez une course en cours</Text>
-                <Ionicons name="chevron-forward" size={20} color="#fff" />
-              </LinearGradient>
-            </TouchableOpacity>
-          )}
-
           {/* BOTTOM CONTAINER */}
           {!selectionMode && (
-            <Animated.View style={[
-              styles.bottomContainer,
-              {
-                position: 'absolute',
-                bottom: keyboardVisible ? (Platform.OS === 'ios' ? 1 : keyboardHeight + 10) : Platform.OS === 'android' ? 80 : 0,
-                left: 0,
-                right: 0,
-                opacity: fadeAnim,
-                transform: [
-                  { translateY: slideAnim.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [0, 100]
-                  })}
-                ]
-              }
-            ]}>
+            <Animated.View
+              style={[
+                styles.bottomContainer,
+                {
+                  position: 'absolute',
+                  bottom: keyboardVisible ? (Platform.OS === 'ios' ? 1 : keyboardHeight + 10) : Platform.OS === 'android' ? 80 : 0,
+                  left: 0,
+                  right: 0,
+                  opacity: fadeAnim,
+                  transform: [
+                    { translateY: slideAnim.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [0, 100]
+                      })
+                    },
+                    { translateY: bottomSheetTranslateY },
+                  ]
+                }
+              ]}
+              {...panResponder.panHandlers}
+            >
               <View style={styles.bottomContainerHeader}>
                 <View style={styles.dragHandle} />
               </View>
@@ -1654,9 +1777,10 @@ const HomeScreenWithMap = ({ userName = "User" }) => {
           )}
 
           {/* WHATSAPP ORDER FAB */}
-          {!selectionMode && (
+          {/* Hide WhatsApp order button when keyboard is open */}
+          {!selectionMode && !keyboardVisible && (
             <TouchableOpacity
-              style={styles.whatsappFab}
+              style={styles.whatsappOrderButton}
               onPress={() => {
                 const message = encodeURIComponent('Bonjour, je souhaite commander une course.');
                 const phone = '25377702036';
@@ -1665,11 +1789,42 @@ const HomeScreenWithMap = ({ userName = "User" }) => {
               }}
               activeOpacity={0.85}
             >
-              <Ionicons name="logo-whatsapp" size={30} color="#fff" />
+              <Ionicons name="logo-whatsapp" size={20} color="#25D366" style={{ marginRight: 8 }} />
+              <Text style={styles.whatsappOrderText}>Commander par WhatsApp - Service client 24/7</Text>
             </TouchableOpacity>
           )}
         </View>
       </KeyboardAvoidingView>
+
+      {/* Floating Active Ride Banner - always visible and centered */}
+      {activeRide && !selectionMode && (
+        <TouchableOpacity
+          style={{
+            position: 'absolute',
+            top: '40%',
+            left: '10%',
+            right: '10%',
+            backgroundColor: '#FF9500',
+            borderRadius: 16,
+            padding: 24,
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999,
+            shadowColor: '#000',
+            shadowOpacity: 0.25,
+            shadowOffset: { width: 0, height: 4 },
+            shadowRadius: 12,
+            elevation: 10,
+          }}
+          onPress={() => navigation.navigate('HomeTabs', { screen: 'Activity' })}
+          activeOpacity={0.92}
+        >
+          <Ionicons name="car-sport" size={28} color="#fff" style={{ marginBottom: 8 }} />
+          <Text style={{ color: '#fff', fontSize: 18, fontWeight: '700', textAlign: 'center' }}>
+            Vous avez une course en cours. Appuyez ici pour voir votre course.
+          </Text>
+        </TouchableOpacity>
+      )}
     </View>
   );
 };

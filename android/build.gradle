@@ -34,5 +34,12 @@ allprojects {
     }
 }
 
+ext {
+    compileSdkVersion = 35
+    buildToolsVersion = '35.0.0'
+    minSdkVersion = 24
+    targetSdkVersion = 35
+}
+
 apply plugin: "expo-root-project"
 apply plugin: "com.facebook.react.rootproject" 

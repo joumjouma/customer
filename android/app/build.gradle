@@ -84,16 +84,16 @@ def enableProguardInReleaseBuilds = (findProperty('android.enableProguardInRelea
 def jscFlavor = 'io.github.react-native-community:jsc-android:2026004.+'
 
 android {
-    ndkVersion rootProject.ext.ndkVersion
+    ndkVersion "27.1.12297006"
 
-    buildToolsVersion rootProject.ext.buildToolsVersion
-    compileSdk rootProject.ext.compileSdkVersion
+    buildToolsVersion "35.0.0"
+    compileSdk 35
 
     namespace 'com.caval.app'
     defaultConfig {
         applicationId 'com.caval.app'
-        minSdkVersion rootProject.ext.minSdkVersion
-        targetSdkVersion rootProject.ext.targetSdkVersion
+        minSdkVersion 24
+        targetSdkVersion 35
         versionCode 5
         versionName "5.0.0"
         
@@ -113,6 +113,7 @@ android {
             }
         }
     }
+    
     signingConfigs {
         debug {
             storeFile file('debug.keystore')

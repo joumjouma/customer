@@ -27,7 +27,4 @@ apply from: new File(["node", "--print", "require.resolve('expo/scripts/autolink
 
 rootProject.name = 'Caval'
 
-expoAutolinking.useExpoVersionCatalog()
-
 include ':app'
-includeBuild(expoAutolinking.reactNativeGradlePlugin)

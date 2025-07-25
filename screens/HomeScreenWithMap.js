@@ -490,34 +490,38 @@ const HomeScreenWithMap = ({ userName = "User" }) => {
   const slideAnim = useRef(new Animated.Value(0)).current;
   const mapScaleAnim = useRef(new Animated.Value(1)).current;
 
-  // Add animated value and pan responder for bottom sheet
-  const bottomSheetTranslateY = useRef(new Animated.Value(0)).current;
-  const DRAG_RANGE = 40; // pixels
+  // Add at the top of the component, after other state declarations
+  const [isBottomSheetExpanded, setIsBottomSheetExpanded] = useState(true);
+  // Change the collapsed position to leave 48px visible (height of drag handle + margin)
+  const BOTTOM_SHEET_HANDLE_HEIGHT = 48;
+  const BOTTOM_SHEET_EXPANDED = 0;
+  const BOTTOM_SHEET_COLLAPSED = height - BOTTOM_SHEET_HANDLE_HEIGHT;
+
+  // Update the panResponder and bottomSheetTranslateY logic
+  const bottomSheetTranslateY = useRef(new Animated.Value(BOTTOM_SHEET_EXPANDED)).current;
 
   const panResponder = useRef(
     PanResponder.create({
       onMoveShouldSetPanResponder: (evt, gestureState) => {
-        // Only respond to vertical drags starting on the drag handle
         return Math.abs(gestureState.dy) > 5 && Math.abs(gestureState.dx) < 20;
       },
       onPanResponderMove: (evt, gestureState) => {
-        // Clamp the drag between -DRAG_RANGE and 0
-        if (gestureState.dy < 0) {
-          bottomSheetTranslateY.setValue(Math.max(gestureState.dy, -DRAG_RANGE));
-        } else {
-          bottomSheetTranslateY.setValue(Math.min(gestureState.dy, 0));
-        }
+        // Clamp between expanded and collapsed
+        let newY = gestureState.dy + (isBottomSheetExpanded ? BOTTOM_SHEET_EXPANDED : BOTTOM_SHEET_COLLAPSED);
+        newY = Math.max(BOTTOM_SHEET_EXPANDED, Math.min(newY, BOTTOM_SHEET_COLLAPSED));
+        bottomSheetTranslateY.setValue(newY);
       },
-      onPanResponderRelease: () => {
-        // Snap back to 0
+      onPanResponderRelease: (evt, gestureState) => {
+        // Snap to nearest state
+        let shouldExpand = gestureState.vy < 0 || gestureState.dy < (BOTTOM_SHEET_COLLAPSED - BOTTOM_SHEET_EXPANDED) / 2;
         Animated.spring(bottomSheetTranslateY, {
-          toValue: 0,
+          toValue: shouldExpand ? BOTTOM_SHEET_EXPANDED : BOTTOM_SHEET_COLLAPSED,
           useNativeDriver: true,
-        }).start();
+        }).start(() => setIsBottomSheetExpanded(shouldExpand));
       },
       onPanResponderTerminate: () => {
         Animated.spring(bottomSheetTranslateY, {
-          toValue: 0,
+          toValue: isBottomSheetExpanded ? BOTTOM_SHEET_EXPANDED : BOTTOM_SHEET_COLLAPSED,
           useNativeDriver: true,
         }).start();
       },
@@ -1436,9 +1440,10 @@ const HomeScreenWithMap = ({ userName = "User" }) => {
                   opacity: fadeAnim,
                   transform: [
                     { translateY: slideAnim.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [0, -20]
-                    })}
+                        inputRange: [0, 1],
+                        outputRange: [0, -20]
+                      }) },
+                    { translateY: Animated.multiply(bottomSheetTranslateY, -1) }
                   ]
                 }
               ]}>
@@ -1520,20 +1525,10 @@ const HomeScreenWithMap = ({ userName = "User" }) => {
               style={[
                 styles.bottomContainer,
                 {
-                  position: 'absolute',
-                  bottom: keyboardVisible ? (Platform.OS === 'ios' ? 1 : keyboardHeight + 10) : Platform.OS === 'android' ? 80 : 0,
-                  left: 0,
-                  right: 0,
-                  opacity: fadeAnim,
                   transform: [
-                    { translateY: slideAnim.interpolate({
-                        inputRange: [0, 1],
-                        outputRange: [0, 100]
-                      })
-                    },
                     { translateY: bottomSheetTranslateY },
-                  ]
-                }
+                  ],
+                },
               ]}
               {...panResponder.panHandlers}
             >
@@ -1779,19 +1774,30 @@ const HomeScreenWithMap = ({ userName = "User" }) => {
           {/* WHATSAPP ORDER FAB */}
           {/* Hide WhatsApp order button when keyboard is open */}
           {!selectionMode && !keyboardVisible && (
-            <TouchableOpacity
-              style={styles.whatsappOrderButton}
-              onPress={() => {
-                const message = encodeURIComponent('Bonjour, je souhaite commander une course.');
-                const phone = '25377702036';
-                const url = `https://wa.me/${phone}?text=${message}`;
-                Linking.openURL(url);
-              }}
-              activeOpacity={0.85}
+            <Animated.View
+              style={[
+                styles.whatsappOrderButton,
+                {
+                  transform: [
+                    { translateY: Animated.multiply(bottomSheetTranslateY, -1) }
+                  ]
+                }
+              ]}
             >
-              <Ionicons name="logo-whatsapp" size={20} color="#25D366" style={{ marginRight: 8 }} />
-              <Text style={styles.whatsappOrderText}>Commander par WhatsApp - Service client 24/7</Text>
-            </TouchableOpacity>
+              <TouchableOpacity
+                style={{flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center'}}
+                onPress={() => {
+                  const message = encodeURIComponent('Bonjour, je souhaite commander une course.');
+                  const phone = '25377702036';
+                  const url = `https://wa.me/${phone}?text=${message}`;
+                  Linking.openURL(url);
+                }}
+                activeOpacity={0.85}
+              >
+                <Ionicons name="logo-whatsapp" size={20} color="#25D366" style={{ marginRight: 8 }} />
+                <Text style={styles.whatsappOrderText}>Commander par WhatsApp - Service client 24/7</Text>
+              </TouchableOpacity>
+            </Animated.View>
           )}
         </View>
       </KeyboardAvoidingView>

@@ -3,7 +3,7 @@
     "name": "Caval",
     "slug": "Caval",
     "owner": "zouhair1234",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "orientation": "portrait",
     "icon": "./assets/caval-customer-icon.png",
     "userInterfaceStyle": "light",
@@ -17,7 +17,7 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.misscoding.Eco-Share-Customer",
       "googleServicesFile": "./GoogleService-Info.plist",
-      "buildNumber": "25",
+      "buildNumber": "30",
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "We need your location to show nearby rides and provide accurate navigation.",
         "NSLocationAlwaysAndWhenInUseUsageDescription": "We need your location to show nearby rides and provide accurate navigation even when the app is in the background.",

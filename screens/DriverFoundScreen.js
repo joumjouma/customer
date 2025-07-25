@@ -164,6 +164,8 @@ const DriverFoundScreen = () => {
   const [customerPickedUp, setCustomerPickedUp] = useState(false);
   const [showOnRouteMessage, setShowOnRouteMessage] = useState(false);
   const [driverPaymentMethods, setDriverPaymentMethods] = useState({});
+  // Add at the top of the component, after other state declarations
+  const routeCoordinatesRef = useRef([]);
 
   // Fetch car details from Firestore
   useEffect(() => {
@@ -235,6 +237,13 @@ const DriverFoundScreen = () => {
         // Transition to destination phase if customer is picked up
         if (data.customerPickedUp || data.status === "picked_up") {
           setTripPhase('to-destination');
+          // Unzoom the map to show the whole trajectory
+          if (routeCoordinatesRef.current && routeCoordinatesRef.current.length > 0 && mapRef.current) {
+            mapRef.current.fitToCoordinates(routeCoordinatesRef.current, {
+              edgePadding: { top: 140, right: 50, bottom: expandedOverlay ? 450 : 300, left: 50 },
+              animated: true,
+            });
+          }
         } else {
           setTripPhase('pickup');
         }
@@ -481,6 +490,7 @@ const DriverFoundScreen = () => {
 
   const handleCustomerRouteReady = (result) => {
     if (result && result.coordinates && result.coordinates.length > 0) {
+      routeCoordinatesRef.current = result.coordinates;
       mapRef.current?.fitToCoordinates(result.coordinates, {
         edgePadding: { top: 140, right: 50, bottom: expandedOverlay ? 450 : 300, left: 50 },
         animated: true,

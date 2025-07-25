@@ -1,16 +1,22 @@
 // Top-level build file where you can add configuration options common to all sub-projects/modules.
 
 buildscript {
+    ext {
+        compileSdkVersion = 35
+        buildToolsVersion = '35.0.0'
+        minSdkVersion = 24
+        targetSdkVersion = 35
+    }
     repositories {
         google()
         mavenCentral()
     }
     dependencies {
         classpath 'com.google.gms:google-services:4.4.1'
-    classpath('com.android.tools.build:gradle')
-    classpath('com.facebook.react:react-native-gradle-plugin')
-    classpath('org.jetbrains.kotlin:kotlin-gradle-plugin')
-  }
+        classpath('com.android.tools.build:gradle')
+        classpath('com.facebook.react:react-native-gradle-plugin')
+        classpath('org.jetbrains.kotlin:kotlin-gradle-plugin')
+    }
 }
 
 def reactNativeAndroidDir = new File(
@@ -32,13 +38,6 @@ allprojects {
         mavenCentral()
         maven { url 'https://www.jitpack.io' }
     }
-}
-
-ext {
-    compileSdkVersion = 35
-    buildToolsVersion = '35.0.0'
-    minSdkVersion = 24
-    targetSdkVersion = 35
 }
 
 apply plugin: "expo-root-project"
